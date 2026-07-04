@@ -1,0 +1,4 @@
+.DS_Store
+config/easygo.env
+*.log
+__pycache__/

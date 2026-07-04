@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EasyGo Lark Bridge — 安装 feishu-cursor-claw 并部署 EasyGo 专属配置
+# EasyGo Lark Bridge — 安装 feishu-cursor-claw（全部在 workspace/easygo-lark-bridge/ 内）
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,12 +9,17 @@ CONFIG_EXAMPLE="${PACK_ROOT}/config/easygo.env.example"
 die() { echo "错误: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
+apply_path_defaults() {
+  CLAW_INSTALL_DIR="${CLAW_INSTALL_DIR:-${PACK_ROOT}/claw}"
+  RUNTIME_DIR="${RUNTIME_DIR:-${EASYGO_CLAW_ROOT:-${PACK_ROOT}/runtime}}"
+  WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(dirname "${PACK_ROOT}")}"
+}
+
 load_config() {
   # shellcheck disable=SC1090
   source "${CONFIG_FILE}"
+  apply_path_defaults
   : "${WORKSPACE_ROOT:?WORKSPACE_ROOT 未设置}"
-  : "${EASYGO_CLAW_ROOT:?EASYGO_CLAW_ROOT 未设置}"
-  : "${CLAW_INSTALL_DIR:?CLAW_INSTALL_DIR 未设置}"
   : "${ALLOWED_OPERATOR_OPEN_ID:?ALLOWED_OPERATOR_OPEN_ID 未设置}"
   : "${FEISHU_APP_ID:?FEISHU_APP_ID 未设置}"
   : "${FEISHU_APP_SECRET:?FEISHU_APP_SECRET 未设置}"
@@ -34,9 +39,45 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "未找到命令: $1"
 }
 
+migrate_legacy_layout() {
+  local old_claw="${HOME}/tools/feishu-cursor-claw"
+  local old_runtime="${WORKSPACE_ROOT}/easygo-claw"
+  local old_tools_inbox="${HOME}/tools/inbox"
+  local old_projects="${HOME}/tools/projects.json"
+
+  if [[ -d "${old_claw}" && "${CLAW_INSTALL_DIR}" != "${old_claw}" && ! -e "${CLAW_INSTALL_DIR}" ]]; then
+    info "迁移 Claw: ${old_claw} → ${CLAW_INSTALL_DIR}"
+    mkdir -p "$(dirname "${CLAW_INSTALL_DIR}")"
+    mv "${old_claw}" "${CLAW_INSTALL_DIR}"
+  fi
+
+  if [[ -d "${old_runtime}" && "${RUNTIME_DIR}" != "${old_runtime}" ]]; then
+    info "迁移 runtime 数据: ${old_runtime} → ${RUNTIME_DIR}"
+    mkdir -p "${RUNTIME_DIR}"
+    # 保留 inbox/logs/state/.cursor/.memory* 等运行时文件
+    for item in inbox logs state .cursor .memory.sqlite .memory.sqlite-shm .memory.sqlite-wal AGENTS.md; do
+      if [[ -e "${old_runtime}/${item}" ]]; then
+        rm -rf "${RUNTIME_DIR}/${item}" 2>/dev/null || true
+        mv "${old_runtime}/${item}" "${RUNTIME_DIR}/${item}"
+      fi
+    done
+    # 旧 symlink 会在 setup_runtime 里重建
+    rmdir "${old_runtime}" 2>/dev/null || info "  可手动删除空目录: ${old_runtime}"
+  fi
+
+  if [[ -L "${old_tools_inbox}" ]]; then
+    rm -f "${old_tools_inbox}"
+    echo "  已移除 ${old_tools_inbox}"
+  fi
+  if [[ -f "${old_projects}" ]]; then
+    rm -f "${old_projects}"
+    echo "  已移除 ${old_projects}"
+  fi
+}
+
 install_claw() {
   if [[ -d "${CLAW_INSTALL_DIR}/.git" ]]; then
-    info "Claw 已存在，跳过 clone: ${CLAW_INSTALL_DIR}"
+    info "Claw 已存在: ${CLAW_INSTALL_DIR}"
   else
     info "克隆 feishu-cursor-claw → ${CLAW_INSTALL_DIR}"
     mkdir -p "$(dirname "${CLAW_INSTALL_DIR}")"
@@ -47,18 +88,18 @@ install_claw() {
   (cd "${CLAW_INSTALL_DIR}" && bun install)
 }
 
-setup_easygo_claw_root() {
-  info "创建 EasyGo Claw Root: ${EASYGO_CLAW_ROOT}"
-  mkdir -p "${EASYGO_CLAW_ROOT}"
+setup_runtime() {
+  info "创建 runtime: ${RUNTIME_DIR}"
+  mkdir -p "${RUNTIME_DIR}"
 
   link_repo() {
     local name="$1"
     local target="$2"
-    local link="${EASYGO_CLAW_ROOT}/${name}"
+    local link="${RUNTIME_DIR}/${name}"
     if [[ -L "${link}" ]]; then
-      echo "  已存在 symlink: ${name}"
+      echo "  symlink: ${name}"
     elif [[ -e "${link}" ]]; then
-      die "${link} 已存在且不是 symlink，请手动处理"
+      die "${link} 已存在且不是 symlink"
     else
       ln -s "${target}" "${link}"
       echo "  创建 symlink: ${name} → ${target}"
@@ -67,84 +108,63 @@ setup_easygo_claw_root() {
 
   link_repo "easygo" "${WORKSPACE_ROOT}/easygo"
   link_repo "frontend" "${WORKSPACE_ROOT}/standard-fe/easygo"
-  link_repo "lark-bridge" "${WORKSPACE_ROOT}/easygo-lark-bridge"
+  link_repo "bridge" "${PACK_ROOT}"
 
-  info "部署 EasyGo .cursor 模板"
-  mkdir -p "${EASYGO_CLAW_ROOT}/.cursor/rules"
-  rsync -a "${PACK_ROOT}/templates/easygo-claw/.cursor/" "${EASYGO_CLAW_ROOT}/.cursor/"
+  info "部署 runtime .cursor 模板"
+  mkdir -p "${RUNTIME_DIR}/.cursor/rules"
+  rsync -a "${PACK_ROOT}/templates/runtime/.cursor/" "${RUNTIME_DIR}/.cursor/"
 
-  info "写入 Authorized Operator open_id"
   sed -i '' "s/{{ALLOWED_OPERATOR_OPEN_ID}}/${ALLOWED_OPERATOR_OPEN_ID}/g" \
-    "${EASYGO_CLAW_ROOT}/.cursor/rules/authorized-operator.mdc"
+    "${RUNTIME_DIR}/.cursor/rules/authorized-operator.mdc"
 }
 
 setup_runtime_dirs() {
-  local tools_root inbox_link sessions_link
+  local bridge_root inbox_link sessions_link projects_dest
 
-  tools_root="$(dirname "${CLAW_INSTALL_DIR}")"
-  inbox_link="${tools_root}/inbox"
+  bridge_root="${PACK_ROOT}"
+  inbox_link="${bridge_root}/inbox"
   sessions_link="${CLAW_INSTALL_DIR}/.sessions.json"
+  projects_dest="${bridge_root}/projects.json"
 
-  info "统一运行时目录 → ${EASYGO_CLAW_ROOT}"
-  mkdir -p "${EASYGO_CLAW_ROOT}/inbox" \
-           "${EASYGO_CLAW_ROOT}/logs" \
-           "${EASYGO_CLAW_ROOT}/state" \
-           "${EASYGO_CLAW_ROOT}/.cursor/sessions"
+  info "Claw 路径（均在 easygo-lark-bridge/ 内）"
+  mkdir -p "${RUNTIME_DIR}/inbox" \
+           "${RUNTIME_DIR}/logs" \
+           "${RUNTIME_DIR}/state" \
+           "${RUNTIME_DIR}/.cursor/sessions"
 
-  # Claw 硬编码 inbox = dirname(claw)/inbox，用 symlink 指到 easygo-claw/inbox
-  if [[ -e "${inbox_link}" && ! -L "${inbox_link}" ]]; then
-    if [[ -n "$(ls -A "${inbox_link}" 2>/dev/null)" ]]; then
-      info "迁移 ${inbox_link}/* → ${EASYGO_CLAW_ROOT}/inbox/"
-      mv "${inbox_link}"/* "${EASYGO_CLAW_ROOT}/inbox/" 2>/dev/null || true
-    fi
-    rmdir "${inbox_link}" 2>/dev/null || die "${inbox_link} 非空目录，请手动合并到 ${EASYGO_CLAW_ROOT}/inbox/"
-  fi
-  ln -sfn "${EASYGO_CLAW_ROOT}/inbox" "${inbox_link}"
-  echo "  inbox → ${EASYGO_CLAW_ROOT}/inbox"
+  ln -sfn "${RUNTIME_DIR}/inbox" "${inbox_link}"
+  echo "  ${inbox_link} → runtime/inbox"
 
-  # Claw 会话索引 .sessions.json 也收拢到 easygo-claw/state/
   if [[ -e "${sessions_link}" && ! -L "${sessions_link}" ]]; then
-    mv "${sessions_link}" "${EASYGO_CLAW_ROOT}/state/sessions.json"
+    mv "${sessions_link}" "${RUNTIME_DIR}/state/sessions.json"
   fi
-  ln -sfn "${EASYGO_CLAW_ROOT}/state/sessions.json" "${sessions_link}"
-  echo "  sessions.json → ${EASYGO_CLAW_ROOT}/state/sessions.json"
+  ln -sfn "${RUNTIME_DIR}/state/sessions.json" "${sessions_link}"
+  echo "  claw/.sessions.json → runtime/state/sessions.json"
 
-  # 迁移旧 /tmp 日志（若存在）
-  if [[ -f /tmp/feishu-cursor.log && ! -f "${EASYGO_CLAW_ROOT}/logs/feishu-cursor.log" ]]; then
-    mv /tmp/feishu-cursor.log "${EASYGO_CLAW_ROOT}/logs/feishu-cursor.log"
-    echo "  已迁移 /tmp/feishu-cursor.log"
+  if [[ -f /tmp/feishu-cursor.log && ! -s "${RUNTIME_DIR}/logs/feishu-cursor.log" ]]; then
+    mv /tmp/feishu-cursor.log "${RUNTIME_DIR}/logs/feishu-cursor.log" 2>/dev/null || true
   fi
+  touch "${RUNTIME_DIR}/logs/feishu-cursor.log"
 
-  mkdir -p "${EASYGO_CLAW_ROOT}/logs"
-  touch "${EASYGO_CLAW_ROOT}/logs/feishu-cursor.log"
-}
-
-setup_claw_config() {
-  local projects_dest
-  projects_dest="$(dirname "${CLAW_INSTALL_DIR}")/projects.json"
-
-  info "写入 Claw projects.json → ${projects_dest}"
+  info "写入 projects.json → ${projects_dest}"
   cp "${PACK_ROOT}/templates/claw/projects.json" "${projects_dest}"
-  # 若用户自定义了 EASYGO_CLAW_ROOT，替换 path
-  if [[ "${EASYGO_CLAW_ROOT}" != "/Users/ic/workspace/easygo-claw" ]]; then
-    python3 - <<PY
+  python3 - <<PY
 import json, pathlib
 p = pathlib.Path("${projects_dest}")
 data = json.loads(p.read_text())
-data["projects"]["easygo"]["path"] = "${EASYGO_CLAW_ROOT}"
+data["projects"]["easygo"]["path"] = "${RUNTIME_DIR}"
 p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 PY
-  fi
+}
 
+setup_claw_config() {
   if [[ ! -f "${CLAW_INSTALL_DIR}/.env" ]]; then
-    info "创建 Claw .env"
     cp "${PACK_ROOT}/templates/claw/.env.example" "${CLAW_INSTALL_DIR}/.env"
   fi
 
-  info "合并密钥到 Claw .env"
+  info "合并密钥到 claw/.env"
   python3 - <<PY
 from pathlib import Path
-
 env_path = Path("${CLAW_INSTALL_DIR}/.env")
 lines = env_path.read_text().splitlines() if env_path.exists() else []
 values = {
@@ -167,32 +187,20 @@ for key, val in values.items():
         out.append(f"{key}={val}")
 env_path.write_text("\n".join(out) + "\n")
 PY
-
-  # GitLab token 供 HEARTBEAT Agent 使用（写入 launchd 环境需用户自行 export 或扩展 service）
-  if [[ -n "${GITLAB_PRIVATE_TOKEN:-}" ]]; then
-    info "检测到 GITLAB_PRIVATE_TOKEN，可在 Claw 运行环境中 export 供 HEARTBEAT 使用"
-  fi
 }
 
 print_next_steps() {
   cat <<EOF
 
-安装完成。
+安装完成。全部路径在 ${PACK_ROOT}/ 内：
+
+  claw/      feishu-cursor-claw
+  runtime/   Agent workspace + 日志/收件/会话
 
 下一步：
-  1. 验证 Agent CLI:
-       bash ${PACK_ROOT}/scripts/verify-agent-workspace.sh
-
-  2. 前台试跑 Claw:
-       cd ${CLAW_INSTALL_DIR} && bun run server.ts
-
-  3. 飞书私聊 Bot 发一条测试指令（请用私聊，不要用群聊）
-
-  4. 注册开机自启（日志在 easygo-claw/logs/）:
-       bash ${PACK_ROOT}/scripts/claw-service.sh install
-       bash ${PACK_ROOT}/scripts/claw-service.sh status
-
-运行时数据目录: ${EASYGO_CLAW_ROOT}/{inbox,logs,state,.cursor/sessions}
+  bash ${PACK_ROOT}/scripts/verify-agent-workspace.sh
+  cd ${CLAW_INSTALL_DIR} && bun run server.ts
+  bash ${PACK_ROOT}/scripts/claw-service.sh install
 
 EOF
 }
@@ -207,15 +215,12 @@ main() {
   require_cmd rsync
   require_cmd python3
 
-  if [[ ! -d "${WORKSPACE_ROOT}/easygo" ]]; then
-    die "未找到后端 repo: ${WORKSPACE_ROOT}/easygo"
-  fi
-  if [[ ! -d "${WORKSPACE_ROOT}/standard-fe/easygo" ]]; then
-    die "未找到前端 repo: ${WORKSPACE_ROOT}/standard-fe/easygo"
-  fi
+  [[ -d "${WORKSPACE_ROOT}/easygo" ]] || die "未找到: ${WORKSPACE_ROOT}/easygo"
+  [[ -d "${WORKSPACE_ROOT}/standard-fe/easygo" ]] || die "未找到: ${WORKSPACE_ROOT}/standard-fe/easygo"
 
+  migrate_legacy_layout
   install_claw
-  setup_easygo_claw_root
+  setup_runtime
   setup_runtime_dirs
   setup_claw_config
   print_next_steps

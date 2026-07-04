@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EasyGo 版 Claw 服务管理：日志与状态文件统一落在 easygo-claw/
+# EasyGo Claw 服务管理（日志在 easygo-lark-bridge/runtime/logs/）
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,15 +10,15 @@ if [[ -f "${CONFIG_FILE}" ]]; then
   source "${CONFIG_FILE}"
 fi
 
-: "${EASYGO_CLAW_ROOT:=/Users/ic/workspace/easygo-claw}"
-: "${CLAW_INSTALL_DIR:=/Users/ic/tools/feishu-cursor-claw}"
+CLAW_INSTALL_DIR="${CLAW_INSTALL_DIR:-${PACK_ROOT}/claw}"
+RUNTIME_DIR="${RUNTIME_DIR:-${EASYGO_CLAW_ROOT:-${PACK_ROOT}/runtime}}"
 
 LABEL="com.easygo.lark-claw"
 PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
 BUN_BIN="$(command -v bun 2>/dev/null || echo "$HOME/.bun/bin/bun")"
-LOG_FILE="${EASYGO_CLAW_ROOT}/logs/feishu-cursor.log"
+LOG_FILE="${RUNTIME_DIR}/logs/feishu-cursor.log"
 
-mkdir -p "${EASYGO_CLAW_ROOT}/logs"
+mkdir -p "${RUNTIME_DIR}/logs"
 
 generate_plist() {
   cat > "$PLIST" <<PEOF
@@ -85,22 +85,18 @@ cmd_stop() {
 cmd_restart() { cmd_stop; sleep 2; cmd_start; }
 
 cmd_status() {
-  echo "EasyGo Claw 服务 (${LABEL})"
+  echo "EasyGo Claw (${LABEL})"
+  echo "  仓库: ${PACK_ROOT}"
   if launchctl print "gui/$(id -u)/${LABEL}" &>/dev/null; then
     echo "  状态: 已安装"
     echo "  日志: ${LOG_FILE}"
-    echo "  数据: ${EASYGO_CLAW_ROOT}"
   else
-    echo "  状态: 未安装 → bash ${PACK_ROOT}/scripts/claw-service.sh install"
+    echo "  状态: 未安装"
   fi
 }
 
 cmd_logs() {
-  if [[ -f "${LOG_FILE}" ]]; then
-    tail -f "${LOG_FILE}"
-  else
-    echo "  日志尚不存在: ${LOG_FILE}"
-  fi
+  [[ -f "${LOG_FILE}" ]] && tail -f "${LOG_FILE}" || echo "  日志不存在: ${LOG_FILE}"
 }
 
 case "${1:-}" in
@@ -112,11 +108,7 @@ case "${1:-}" in
   status)    cmd_status ;;
   logs)      cmd_logs ;;
   *)
-    cat <<EOF
-用法: bash ${PACK_ROOT}/scripts/claw-service.sh <install|uninstall|start|stop|restart|status|logs>
-
-日志: ${LOG_FILE}
-数据: ${EASYGO_CLAW_ROOT}/{inbox,logs,state,.cursor/sessions}
-EOF
+    echo "用法: bash ${PACK_ROOT}/scripts/claw-service.sh <install|status|logs|...>"
+    echo "日志: ${LOG_FILE}"
     ;;
 esac

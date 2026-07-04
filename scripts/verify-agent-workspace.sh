@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# 验证 Cursor Agent CLI 对 EasyGo workspace 的支持（D 策略 · 升级路径探测）
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,48 +9,44 @@ if [[ -f "${CONFIG_FILE}" ]]; then
   source "${CONFIG_FILE}"
 fi
 
-EASYGO_CLAW_ROOT="${EASYGO_CLAW_ROOT:-/Users/ic/workspace/easygo-claw}"
+RUNTIME_DIR="${RUNTIME_DIR:-${EASYGO_CLAW_ROOT:-${PACK_ROOT}/runtime}}"
 EASYGO_WORKSPACE_FILE="${EASYGO_WORKSPACE_FILE:-/Users/ic/workspace/easygo-dev.code-workspace}"
 AGENT_BIN="${AGENT_BIN:-$HOME/.local/bin/agent}"
 
-echo "==> EasyGo Agent Workspace 验证"
+export CURSOR_API_KEY="${CURSOR_API_KEY:-}"
+
+echo "==> Agent workspace 验证"
+echo "    runtime=${RUNTIME_DIR}"
 echo ""
 
 if [[ ! -x "${AGENT_BIN}" ]]; then
   echo "❌ 未找到 Agent CLI: ${AGENT_BIN}"
-  echo "   请先安装: cursor agent update  （或见 Cursor 官方文档）"
   exit 1
 fi
-echo "✅ Agent CLI: ${AGENT_BIN}"
-"$AGENT_BIN" --version 2>/dev/null || true
-echo ""
+
+if [[ -z "${CURSOR_API_KEY}" ]]; then
+  echo "⚠️  未设置 CURSOR_API_KEY（source config/easygo.env 后再试）"
+fi
 
 run_probe() {
-  local label="$1"
-  local workspace="$2"
-  echo "── 探测: ${label}"
-  echo "    workspace=${workspace}"
+  local label="$1" workspace="$2"
+  echo "── ${label}: ${workspace}"
   if "$AGENT_BIN" --workspace "${workspace}" -p --force --trust \
-    "只回复一行：当前 workspace 根目录的绝对路径是什么？" 2>&1; then
-    echo "✅ ${label} 可用"
+    "只回复一行：OK" 2>&1; then
+    echo "✅ 通过"
   else
-    echo "❌ ${label} 失败"
+    echo "❌ 失败"
     return 1
   fi
   echo ""
 }
 
 FAIL=0
-run_probe "easygo-claw 目录（当前基线）" "${EASYGO_CLAW_ROOT}" || FAIL=1
+run_probe "runtime 目录" "${RUNTIME_DIR}" || FAIL=1
 
 if [[ -f "${EASYGO_WORKSPACE_FILE}" ]]; then
-  run_probe ".code-workspace 文件（升级路径）" "${EASYGO_WORKSPACE_FILE}" || {
-    echo "ℹ️  .code-workspace 暂不可用，继续使用 easygo-claw/ symlink 目录即可。"
-    echo "    若日后 Agent CLI 支持，可给 feishu-cursor-claw 提 PR 分离 templateDir 与 agentWorkspace。"
-  }
-else
-  echo "⚠️  未找到 ${EASYGO_WORKSPACE_FILE}，跳过 .code-workspace 探测"
+  run_probe ".code-workspace（可选）" "${EASYGO_WORKSPACE_FILE}" || \
+    echo "ℹ️  .code-workspace 不可用，使用 runtime/ 即可。"
 fi
 
-echo "==> 完成"
 exit "${FAIL}"

@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "easygo": {
+      "path": "/Users/ic/workspace/easygo-claw",
+      "description": "EasyGo 前后端 + 飞书桥接（symlink 隔离根）"
+    }
+  },
+  "default_project": "easygo"
+}

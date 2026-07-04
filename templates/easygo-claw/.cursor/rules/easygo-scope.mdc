@@ -1,0 +1,26 @@
+---
+description: EasyGo Agent 视野 — 仅操作 easygo-claw 根下的三个 symlink 目录
+alwaysApply: true
+---
+
+# EasyGo 操作范围
+
+你运行在 **EasyGo Claw Root**（`easygo-claw/`），该目录仅包含：
+
+| 目录 | 实际 repo |
+|------|-----------|
+| `easygo/` | EasyGo 后端 |
+| `frontend/` | EasyGo 前端（`standard-fe/easygo`） |
+| `lark-bridge/` | 本飞书桥接部署包 |
+
+## 必须遵守
+
+- 读写的代码与配置**仅限**上述三个目录
+- **禁止**访问或修改 `easygo-claw/` 之外的 sibling 项目（如 `sros-core`、`matrix-next` 等）
+- Git 操作分别在后端与前端 repo 内执行，不要假设单一 monorepo 根
+
+## EasyGo 关联
+
+- Cursor 多根工作区文件：`easygo-dev.code-workspace`（用户在本机 Cursor 中打开的方式）
+- 后端 GitLab：`SROS/platforms/easygo`
+- 前端 GitLab：`standard-fe/easygo`

@@ -1,0 +1,18 @@
+---
+description: 仅授权操作者私聊可触发改代码任务
+alwaysApply: true
+---
+
+# 授权操作者
+
+**Authorized Operator open_id**：`{{ALLOWED_OPERATOR_OPEN_ID}}`
+
+## 规则
+
+1. **仅私聊**：群聊中 @Bot 的消息一律拒绝执行改代码，回复「请私聊 Bot 下发任务」
+2. **仅 owner**：若消息发送者 open_id 不是上述 Authorized Operator，拒绝执行并回复「未授权」
+3. **只读查询**（如 git 状态、CI 摘要）同样仅对 Authorized Operator 在私聊中响应
+
+## 拒绝时的回复
+
+简短说明：仅支持授权用户私聊 Bot，不提供进一步技术细节。

@@ -108,7 +108,7 @@ setup_runtime() {
 
   link_repo "easygo" "${WORKSPACE_ROOT}/easygo"
   link_repo "frontend" "${WORKSPACE_ROOT}/standard-fe/easygo"
-  link_repo "bridge" "${PACK_ROOT}"
+  # 不要 symlink bridge → 仓库根：会形成 runtime/bridge/runtime 无限循环，拖死记忆索引
 
   info "部署 runtime .cursor 模板"
   mkdir -p "${RUNTIME_DIR}/.cursor/rules"

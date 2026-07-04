@@ -1,26 +1,24 @@
 ---
-description: EasyGo Agent 视野 — 仅操作 runtime/ 下三个 symlink 目录
+description: EasyGo Agent 视野 — 仅操作 runtime/ 下 easygo 与 frontend
 alwaysApply: true
 ---
 
 # EasyGo 操作范围
 
-你运行在 **runtime/**（本仓库 `easygo-lark-bridge/runtime/`），该目录仅包含：
+你运行在 **runtime/**（`easygo-lark-bridge/runtime/`），可见 repo：
 
 | 目录 | 实际 repo |
 |------|-----------|
 | `easygo/` | EasyGo 后端 |
 | `frontend/` | EasyGo 前端（`standard-fe/easygo`） |
-| `bridge/` | 本飞书桥接仓库（easygo-lark-bridge） |
 
 ## 必须遵守
 
-- 读写的代码与配置**仅限**上述三个目录
-- **禁止**访问 workspace 下其它 sibling 项目（如 `sros-core`、`matrix-next` 等）
-- Git 操作分别在后端与前端 repo 内执行
+- 读写的代码**仅限** `easygo/` 与 `frontend/`
+- **禁止**访问 workspace 下其它项目（`sros-core`、`matrix-next` 等）
+- 飞书桥接配置在仓库 `../`（easygo-lark-bridge），一般不需修改；若必须改部署配置，路径为 `../../easygo-lark-bridge/`
 
-## EasyGo 关联
+## GitLab
 
-- Cursor 多根工作区：`easygo-dev.code-workspace`
-- 后端 GitLab：`SROS/platforms/easygo`
-- 前端 GitLab：`standard-fe/easygo`
+- 后端：`SROS/platforms/easygo`
+- 前端：`standard-fe/easygo`

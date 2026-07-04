@@ -2,7 +2,7 @@
 
 ## 状态
 
-已接受（2026-07-05）
+已取代（2026-07-05）——见 [0002-single-tree-under-bridge-root.md](./0002-single-tree-under-bridge-root.md)。
 
 ## 背景
 

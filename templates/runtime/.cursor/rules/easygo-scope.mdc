@@ -18,6 +18,12 @@ alwaysApply: true
 - **禁止**访问 workspace 下其它项目（`sros-core`、`matrix-next` 等）
 - 飞书桥接配置在仓库 `../`（easygo-lark-bridge），一般不需修改；若必须改部署配置，路径为 `../../easygo-lark-bridge/`
 
+## Git 基线（状态汇报必遵）
+
+- **前端** `frontend/`：日常对齐 **`dev`**，状态扫描写相对 `origin/dev` 的差异，默认不写相对 main
+- **后端根** `easygo/`：按当前 feature/fix 分支汇报即可
+- **后端 src/**：`easygo/src/*/` 下多为**独立 git 子仓库**（如 `easygo-app`、`easygo_bringup`），状态汇总时必须扫描，优先报有改动或未同步 remote 的包（详见 `git-status-report.mdc`）
+
 ## GitLab
 
 - 后端：`SROS/platforms/easygo`

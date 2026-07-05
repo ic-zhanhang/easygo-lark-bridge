@@ -220,6 +220,7 @@ main() {
 
   migrate_legacy_layout
   install_claw
+  bash "${PACK_ROOT}/scripts/patch-claw-dedupe.sh"
   setup_runtime
   setup_runtime_dirs
   setup_claw_config

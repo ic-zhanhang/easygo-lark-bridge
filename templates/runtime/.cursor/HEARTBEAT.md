@@ -4,10 +4,11 @@
 
 ## 检查项
 
-1. **Git 状态** — `easygo/` 与 `frontend/`：
-   - 当前分支
-   - 是否有未提交变更
-   - 相对 origin 领先/落后 commit 数
+1. **Git 状态** — `easygo/`、`frontend/`、`easygo/src/*/` 子仓库：
+   - 各 repo 当前分支、是否有未提交变更、是否与 origin 同步
+   - **前端** `frontend/`：相对 **`origin/dev`** 领先/落后（不是 main）
+   - **后端根** `easygo/`：当前分支与 remote 状态
+   - **后端 src/**：扫描 `easygo/src/*/` 独立 git 仓库，优先报 dirty / ahead / behind 异常项
 
 2. **GitLab CI** — 若环境变量 `GITLAB_PRIVATE_TOKEN` 可用：
    - 后端 `SROS/platforms/easygo` 当前分支最近 pipeline 状态

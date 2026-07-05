@@ -5,6 +5,8 @@ alwaysApply: true
 
 # 任务完成回复（Task Completion Reply）
 
+**改代码 / 执行指令**类任务结束时用本结构。**纯状态扫描**（扫 git、看分支）→ 用 `git-status-report.mdc`，不用下面模板。
+
 每次通过飞书触发的改代码任务结束时，最后一条回复必须使用以下结构：
 
 ```markdown

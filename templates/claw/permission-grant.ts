@@ -149,20 +149,28 @@ function updateOperators(
 	return { ids, names };
 }
 
-function syncRules(packRoot: string, runtimeDir: string): void {
+function readBridgeProfile(envPath: string): string {
+	const profile = readEnvPairs(envPath).get("BRIDGE_PROFILE")?.trim();
+	if (profile === "mac" || profile === "linux") return profile;
+	// 未显式配置时默认 mac（与 sync-authorized-operators.sh 一致）
+	return "mac";
+}
+
+function syncRules(packRoot: string, runtimeDir: string, envPath: string): void {
+	const bridgeProfile = readBridgeProfile(envPath);
 	const script = resolve(packRoot, "scripts/sync-authorized-operators.sh");
 	const r = spawnSync("bash", [script], {
 		cwd: packRoot,
 		env: {
 			...process.env,
 			RUNTIME_DIR: runtimeDir,
-			BRIDGE_PROFILE: process.env.BRIDGE_PROFILE ?? "linux",
+			BRIDGE_PROFILE: bridgeProfile,
 		},
 		stdio: "pipe",
 		encoding: "utf-8",
 	});
 	if (r.status !== 0) {
-		console.warn("[权限] sync-authorized-operators 失败:", r.stderr || r.stdout);
+		console.warn(`[权限] sync-authorized-operators 失败 (profile=${bridgeProfile}):`, r.stderr || r.stdout);
 	}
 }
 
@@ -191,7 +199,7 @@ export async function handlePermissionGrant(params: {
 
 	const revoke = isRevokeIntent(text);
 	updateOperators(envPath, target.openId, target.name, revoke);
-	syncRules(packRoot, runtimeDir);
+	syncRules(packRoot, runtimeDir, envPath);
 
 	const action = revoke ? "revoke" : "grant";
 	const verb = revoke ? "已移除" : "已添加";

@@ -71,6 +71,8 @@ bash scripts/claw-service-linux.sh logs
 
 ## 更新桥接包
 
+Mac 改完 push 后，在 Linux 执行（**标准流程，见 `.cursor/rules/deploy-workflow.mdc`**）：
+
 ```bash
 cd ~/workspace/ic-lark-assistant
 git pull

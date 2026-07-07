@@ -277,12 +277,13 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-agent-timeout.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-sync.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-cmd.sh"
-  bash "${PACK_ROOT}/scripts/patch-claw-bot-openid-retry.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-topic-agent.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-group-topic-gate-fix.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-types-after-gate.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-reply-card-retry.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-card-delivery-fix.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-mention-id-fix.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-bot-openid-retry.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-permission-gate.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-group-quiet-reply.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-env-unify.sh" || true

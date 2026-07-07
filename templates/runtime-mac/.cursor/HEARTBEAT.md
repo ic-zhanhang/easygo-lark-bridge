@@ -1,14 +1,10 @@
 # EasyGo 心跳检查（达妮娅 · Mac）
 
-**调度**：**10:00–22:00**，约 **每 2 小时** 一次。无事回复 `HEARTBEAT_OK`。
+**调度**：**10:00–22:00**，约 **每 2 小时** 一次。
 
-## 检查项
+Claw 心跳会 **直接执行** `../scripts/sync-dev-repos.sh`（不经过 Agent 猜命令），拉取本地仓库后推飞书。
 
-1. **Git 状态** — `easygo/`、`frontend/`、`easygo/src/*/` 子仓库
-2. **GitLab CI** — 若 `GITLAB_PRIVATE_TOKEN` 可用
-3. **开放 MR** — 与我相关的 open MR
+完整仓库列表与分支规则见同目录 `HEARTBEAT.md`（与 `templates/runtime/.cursor/HEARTBEAT.md` 同步）。
 
-## 约束
-
-- **只读**；范围仅 `easygo/`、`frontend/`
-- 异常优先；无异常可简短报告
+- **frontend** → `dev`
+- **其余全部** → `main`

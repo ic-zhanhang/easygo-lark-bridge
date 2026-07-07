@@ -1,53 +1,48 @@
 # easygo-lark-bridge
 
-EasyGo 飞书遥控 Cursor Agent — **全部在 `workspace/easygo-lark-bridge/` 一棵树内**。
+EasyGo 飞书遥控 Cursor Agent — **双 Bot、双机**：Mac **达妮娅** + Linux **秧秧**。
 
 ```
-easygo-lark-bridge/          ← 本 git 仓库（你在 Cursor 里已打开）
+easygo-lark-bridge/          ← 本 git 仓库
 ├── claw/                    feishu-cursor-claw（install 克隆，不入库）
-├── runtime/                 Agent workspace + 日志/收件/会话（不入库）
-│   ├── easygo/   → ../../easygo
-│   ├── frontend/ → ../../standard-fe/easygo
-│   ├── bridge/   → ..
-│   ├── inbox/
-│   ├── logs/feishu-cursor.log
-│   └── .cursor/sessions/
-├── inbox → runtime/inbox    Claw 硬编码路径
-├── projects.json
-├── config/  scripts/  templates/  docs/
+├── runtime/                 Agent workspace（不入库）
+├── templates/
+│   ├── runtime-mac/         达妮娅模板 + Mac dev-environment
+│   └── runtime-linux/       秧秧模板 + Linux dev-environment
+├── config/  scripts/  docs/
 ```
 
-> 术语：[CONTEXT.md](./CONTEXT.md) · 安装：[docs/集成指南.md](./docs/集成指南.md)
+> 术语：[CONTEXT.md](./CONTEXT.md) · Mac：[docs/集成指南.md](./docs/集成指南.md) · Linux：[docs/Linux安装.md](./docs/Linux安装.md)
 
-## 快速开始
+## Mac（达妮娅）
 
 ```bash
 cp config/easygo.env.example config/easygo.env
-# 填写 ALLOWED_OPERATOR_OPEN_ID、FEISHU_APP_SECRET、CURSOR_API_KEY
-
 bash scripts/install.sh
-bash scripts/claw-service.sh install   # 可选：开机自启
+bash scripts/claw-service.sh install   # launchd
 ```
 
-飞书 **私聊** Bot `ic`，Claw 在 `claw/` 里跑，Agent 在 `runtime/` 里改 easygo / frontend 代码。
-
-## 查看消息与日志
-
-| 内容 | 位置 |
-|------|------|
-| 飞书聊天 | 飞书 App → 与 `ic` 私聊 |
-| 服务日志 | `runtime/logs/feishu-cursor.log` |
-| 对话记录 | `runtime/.cursor/sessions/*.jsonl` |
-| 附件 | `runtime/inbox/` |
+## Linux（秧秧）
 
 ```bash
-bash scripts/claw-service.sh logs
+git clone <本仓库> ~/workspace/ic-lark-assistant
+cp config/easygo.env.linux.example config/easygo.env
+bash scripts/install-linux.sh
+bash scripts/claw-service-linux.sh install   # systemd
 ```
 
-## 关联
+两台机器用**不同飞书 App**；同一仓库、不同 `config/easygo.env`。
 
-| 名称 | 路径 |
-|------|------|
-| Cursor workspace | `../easygo-dev.code-workspace` |
-| 后端 | `../easygo` |
-| 前端 | `../standard-fe/easygo` |
+## 使用
+
+飞书群 @达妮娅 或 @秧秧；每条消息独立任务，不续聊。
+
+| Bot | 机器 | 日志 |
+|-----|------|------|
+| 达妮娅 | Mac | `runtime/logs/feishu-cursor.log` |
+| 秧秧 | Linux | 同上（在 Linux clone 目录内） |
+
+```bash
+bash scripts/claw-service.sh logs          # Mac
+bash scripts/claw-service-linux.sh logs    # Linux
+```

@@ -1,4 +1,8 @@
-# runtime/ 目录说明
+# Runtime 模板（已拆分）
 
-`install.sh` 会在仓库内创建 `runtime/`（Agent workspace + 日志/收件/会话）。  
-模板源文件在本目录的 `.cursor/` 下。
+请使用：
+
+- **`runtime-mac/`** — 达妮娅 · Mac
+- **`runtime-linux/`** — 秧秧 · Linux
+
+本目录保留作兼容；新安装走 `install.sh` 的 `BRIDGE_PROFILE`，不再直接 rsync 此处。

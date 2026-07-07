@@ -13,6 +13,18 @@ apply_path_defaults() {
   CLAW_INSTALL_DIR="${CLAW_INSTALL_DIR:-${PACK_ROOT}/claw}"
   RUNTIME_DIR="${RUNTIME_DIR:-${EASYGO_CLAW_ROOT:-${PACK_ROOT}/runtime}}"
   WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(dirname "${PACK_ROOT}")}"
+  BRIDGE_PROFILE="${BRIDGE_PROFILE:-mac}"
+  case "${BRIDGE_PROFILE}" in
+    mac|linux) ;;
+    *) die "BRIDGE_PROFILE 须为 mac 或 linux，当前: ${BRIDGE_PROFILE}" ;;
+  esac
+  if [[ -d "${PACK_ROOT}/templates/runtime-${BRIDGE_PROFILE}" ]]; then
+    RUNTIME_TEMPLATE="${PACK_ROOT}/templates/runtime-${BRIDGE_PROFILE}"
+  elif [[ -d "${PACK_ROOT}/templates/runtime" ]]; then
+    RUNTIME_TEMPLATE="${PACK_ROOT}/templates/runtime"
+  else
+    die "未找到 runtime 模板: templates/runtime-${BRIDGE_PROFILE}"
+  fi
 }
 
 load_config() {
@@ -20,7 +32,10 @@ load_config() {
   source "${CONFIG_FILE}"
   apply_path_defaults
   : "${WORKSPACE_ROOT:?WORKSPACE_ROOT 未设置}"
-  : "${ALLOWED_OPERATOR_OPEN_ID:?ALLOWED_OPERATOR_OPEN_ID 未设置}"
+  if [[ -z "${ALLOWED_OPERATOR_OPEN_IDS:-}" && -n "${ALLOWED_OPERATOR_OPEN_ID:-}" ]]; then
+    ALLOWED_OPERATOR_OPEN_IDS="${ALLOWED_OPERATOR_OPEN_ID}"
+  fi
+  : "${ALLOWED_OPERATOR_OPEN_IDS:?ALLOWED_OPERATOR_OPEN_IDS 未设置（逗号分隔多个 open_id）}"
   : "${FEISHU_APP_ID:?FEISHU_APP_ID 未设置}"
   : "${FEISHU_APP_SECRET:?FEISHU_APP_SECRET 未设置}"
   : "${CURSOR_API_KEY:?CURSOR_API_KEY 未设置}"
@@ -30,7 +45,7 @@ ensure_config() {
   if [[ ! -f "${CONFIG_FILE}" ]]; then
     cp "${CONFIG_EXAMPLE}" "${CONFIG_FILE}"
     echo "已创建 ${CONFIG_FILE}"
-    echo "请填写 FEISHU_APP_SECRET、CURSOR_API_KEY、ALLOWED_OPERATOR_OPEN_ID 后重新运行。"
+    echo "请填写 FEISHU_APP_SECRET、CURSOR_API_KEY、ALLOWED_OPERATOR_OPEN_IDS 后重新运行。"
     exit 0
   fi
 }
@@ -110,12 +125,11 @@ setup_runtime() {
   link_repo "frontend" "${WORKSPACE_ROOT}/standard-fe/easygo"
   # 不要 symlink bridge → 仓库根：会形成 runtime/bridge/runtime 无限循环，拖死记忆索引
 
-  info "部署 runtime .cursor 模板"
+  info "部署 runtime .cursor 模板 (${BRIDGE_PROFILE}: ${RUNTIME_TEMPLATE})"
   mkdir -p "${RUNTIME_DIR}/.cursor/rules"
-  rsync -a "${PACK_ROOT}/templates/runtime/.cursor/" "${RUNTIME_DIR}/.cursor/"
+  rsync -a "${RUNTIME_TEMPLATE}/.cursor/" "${RUNTIME_DIR}/.cursor/"
 
-  sed -i '' "s/{{ALLOWED_OPERATOR_OPEN_ID}}/${ALLOWED_OPERATOR_OPEN_ID}/g" \
-    "${RUNTIME_DIR}/.cursor/rules/authorized-operator.mdc"
+  bash "${PACK_ROOT}/scripts/sync-authorized-operators.sh"
 }
 
 setup_runtime_dirs() {
@@ -190,9 +204,15 @@ PY
 }
 
 print_next_steps() {
+  local service_hint
+  if [[ "${BRIDGE_PROFILE}" == "linux" ]]; then
+    service_hint="  bash ${PACK_ROOT}/scripts/claw-service-linux.sh install"
+  else
+    service_hint="  bash ${PACK_ROOT}/scripts/claw-service.sh install"
+  fi
   cat <<EOF
 
-安装完成。全部路径在 ${PACK_ROOT}/ 内：
+安装完成 [profile=${BRIDGE_PROFILE}]。路径在 ${PACK_ROOT}/ 内：
 
   claw/      feishu-cursor-claw
   runtime/   Agent workspace + 日志/收件/会话
@@ -200,13 +220,13 @@ print_next_steps() {
 下一步：
   bash ${PACK_ROOT}/scripts/verify-agent-workspace.sh
   cd ${CLAW_INSTALL_DIR} && bun run server.ts
-  bash ${PACK_ROOT}/scripts/claw-service.sh install
+${service_hint}
 
 EOF
 }
 
 main() {
-  info "EasyGo Lark Bridge 安装"
+  info "EasyGo Lark Bridge 安装 (profile=${BRIDGE_PROFILE:-mac})"
   ensure_config
   load_config
 
@@ -221,6 +241,14 @@ main() {
   migrate_legacy_layout
   install_claw
   bash "${PACK_ROOT}/scripts/patch-claw-dedupe.sh"
+  if [[ "${BRIDGE_PROFILE}" == "linux" ]]; then
+    bash "${PACK_ROOT}/scripts/patch-claw-profile-linux.sh"
+  else
+    bash "${PACK_ROOT}/scripts/patch-claw-profile.sh"
+  fi
+  bash "${PACK_ROOT}/scripts/patch-claw-no-resume.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-group-mention.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-agent-timeout.sh"
   setup_runtime
   setup_runtime_dirs
   setup_claw_config

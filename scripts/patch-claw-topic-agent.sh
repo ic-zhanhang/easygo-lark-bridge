@@ -271,11 +271,15 @@ text = text.replace(disp_old, disp_new, 1)
 handle_invoke_old = """\t\t\t\tparsedText = stripMentionPlaceholders(parsedText, mentions);
 \t\t\t}
 
-\t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);"""
+\t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);
+\t\t\thandle({ text: parsedText.trim(), messageId, chatId, chatType, messageType, content, senderOpenId }).catch(console.error);"""
 
 # topic-agent patch 在 group-mention 之后运行，gate 由 patch-claw-group-topic-gate-fix 注入
 
-handle_invoke_new = """\t\t\tconst topicKey = TopicAgent.getTopicKey(chatType, threadId, senderOpenId);
+handle_invoke_new = """\t\t\t\tparsedText = stripMentionPlaceholders(parsedText, mentions);
+\t\t\t}
+
+\t\t\tconst topicKey = TopicAgent.getTopicKey(chatType, threadId, senderOpenId);
 \t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} thread=${threadId?.slice(0, 12) ?? "-"} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);
 \t\t\thandle({ text: parsedText.trim(), messageId, chatId, chatType, messageType, content, senderOpenId, threadId, topicKey }).catch(console.error);"""
 

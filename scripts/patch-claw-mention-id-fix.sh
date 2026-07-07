@@ -20,8 +20,19 @@ server = Path(sys.argv[1])
 text = server.read_text()
 changed = False
 
+# fix-up：启动日志不打印 open_id（已打补丁的环境也适用）
+old_bot_log = "\t\t\t\tconsole.log(`[Bot] open_id=${id} name=${name ?? \"?\"}`);"
+new_bot_log = "\t\t\t\tconsole.log(`[Bot] 已就绪 name=${name ?? \"?\"}`);"
+if old_bot_log in text:
+    text = text.replace(old_bot_log, new_bot_log, 1)
+    changed = True
+
 if "CLAW_MENTION_ID_FIX" in text and "CLAW_BOT_OPENID_RETRY" in text:
-    print("patch-claw-mention-id-fix: 已应用，跳过")
+    if changed:
+        server.write_text(text)
+        print("patch-claw-mention-id-fix: 启动日志不再打印 open_id")
+    else:
+        print("patch-claw-mention-id-fix: 已应用，跳过")
     sys.exit(0)
 
 if "let botOpenId: string | undefined;" not in text:
@@ -75,7 +86,7 @@ fetch_new = """async function fetchBotOpenId(): Promise<string | undefined> {
 \t\t\tconst name = r.bot?.app_name;
 \t\t\tif (name) botDisplayName = name;
 \t\t\tif (id) {
-\t\t\t\tconsole.log(`[Bot] open_id=${id} name=${name ?? "?"}`);
+\t\t\t\tconsole.log(`[Bot] 已就绪 name=${name ?? "?"}`);
 \t\t\t\treturn id;
 \t\t\t}
 \t\t} catch (e) {

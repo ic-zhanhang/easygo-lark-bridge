@@ -47,7 +47,7 @@ async function fetchBotOpenId(): Promise<string | undefined> {
 \t\t\tmethod: "GET",
 \t\t})) as { bot?: { open_id?: string; app_name?: string } };
 \t\tconst id = r.bot?.open_id;
-\t\tif (id) console.log(`[Bot] open_id=${id} name=${r.bot?.app_name ?? "?"}`);
+\t\tif (id) console.log(`[Bot] 已就绪 name=${r.bot?.app_name ?? "?"}`);
 \t\treturn id;
 \t} catch (e) {
 \t\tconsole.warn("[Bot] 无法获取 open_id，群聊 @ 过滤将不可用:", e);

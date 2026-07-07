@@ -78,40 +78,9 @@ if "CLAW_RUNTIME_TUNING_IDLE" not in text:
 
     old_run_sig = "): Promise<{ result: string; quotaWarning?: string }> {"
     new_run_sig = "): Promise<{ result: string; quotaWarning?: string; usage?: { inputTokens?: number; outputTokens?: number } }> {"
-    # runAgent 的签名（async function runAgent 之后）
     idx = text.find("async function runAgent(")
     if idx >= 0 and old_run_sig in text[idx:idx + 800]:
         text = text[:idx] + text[idx:].replace(old_run_sig, new_run_sig, 1)
-
-    old_first = """\t\t\t\tconst { result, sessionId } = await execAgent(lockKey, workspace, primaryModel, prompt, {
-\t\t\t\t\tsessionId: existingSessionId,
-\t\t\t\t\t...execOpts,
-\t\t\t\t});
-\t\t\t\tif (sessionId) {
-\t\t\t\t\tsetActiveSession(workspace, sessionId);
-\t\t\t\t\tif (isNewSession) {
-\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
-\t\t\t\t\t}
-\t\t\t\t}
-\t\t\t\treturn { result };"""
-    new_first = """\t\t\t\tconst { result, sessionId, usage } = await execAgent(lockKey, workspace, primaryModel, prompt, {
-\t\t\t\t\tsessionId: existingSessionId,
-\t\t\t\t\t...execOpts,
-\t\t\t\t});
-\t\t\t\tif (sessionId) {
-\t\t\t\t\tsetActiveSession(workspace, sessionId);
-\t\t\t\t\tif (isNewSession) {
-\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
-\t\t\t\t\t}
-\t\t\t\t}
-\t\t\t\treturn { result, usage };"""
-    if old_first in text:
-        text = text.replace(old_first, new_first, 1)
-
-    old_handle = "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart });"
-    new_handle = "\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart });"
-    if old_handle in text:
-        text = text.replace(old_handle, new_handle, 1)
 
     old_log = "\t\tconsole.log(`[${new Date().toISOString()}] 完成 [${label}] model=${usedModel} elapsed=${elapsed} (${result.length} chars)`);"
     new_log = "\t\tconst tokLog = usage?.inputTokens != null ? ` inputTokens=${usage.inputTokens}` : \"\";\n\t\tconsole.log(`[${new Date().toISOString()}] 完成 [${label}] model=${usedModel} elapsed=${elapsed} (${result.length} chars)${tokLog}`);"
@@ -130,8 +99,124 @@ if "CLAW_RUNTIME_TUNING_IDLE" not in text:
         text = text.replace(banner_old, banner_new, 1)
         changed.append("启动 banner")
 
+# 兼容 topic-agent / no-resume 等后续 patch 的 usage 传播 fix-up
+replacements = [
+    (
+        "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });",
+        "\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });",
+        "handle usage 解构(topicKey)",
+    ),
+    (
+        "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart });",
+        "\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart });",
+        "handle usage 解构",
+    ),
+    (
+        """\t\t\t\tconst { result, sessionId } = await execAgent(lockKey, workspace, primaryModel, prompt, {
+\t\t\t\t\tsessionId: existingSessionId,
+\t\t\t\t\t...execOpts,
+\t\t\t\t});
+\t\t\t\tif (sessionId && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\tif (isNewSession) {
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\treturn { result };""",
+        """\t\t\t\tconst { result, sessionId, usage } = await execAgent(lockKey, workspace, primaryModel, prompt, {
+\t\t\t\t\tsessionId: existingSessionId,
+\t\t\t\t\t...execOpts,
+\t\t\t\t});
+\t\t\t\tif (sessionId && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\tif (isNewSession) {
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\treturn { result, usage };""",
+        "runAgent 主路径 usage",
+    ),
+    (
+        """\t\t\t\tconst { result, sessionId } = await execAgent(lockKey, workspace, primaryModel, prompt, {
+\t\t\t\t\tsessionId: existingSessionId,
+\t\t\t\t\t...execOpts,
+\t\t\t\t});
+\t\t\t\tif (sessionId) {
+\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\tif (isNewSession) {
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\treturn { result };""",
+        """\t\t\t\tconst { result, sessionId, usage } = await execAgent(lockKey, workspace, primaryModel, prompt, {
+\t\t\t\t\tsessionId: existingSessionId,
+\t\t\t\t\t...execOpts,
+\t\t\t\t});
+\t\t\t\tif (sessionId) {
+\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\tif (isNewSession) {
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\treturn { result, usage };""",
+        "runAgent 主路径 usage(无 resume)",
+    ),
+    (
+        """\t\t\t\t\tconst { result, sessionId } = await execAgent(lockKey, workspace, primaryModel, prompt, execOpts);
+\t\t\t\t\tif (sessionId && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t\treturn { result };""",
+        """\t\t\t\t\tconst { result, sessionId, usage } = await execAgent(lockKey, workspace, primaryModel, prompt, execOpts);
+\t\t\t\t\tif (sessionId && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t\treturn { result, usage };""",
+        "runAgent 重试 usage",
+    ),
+    (
+        """\t\t\t\t\tconst { result, sessionId: newSid } = await execAgent(lockKey, workspace, "auto", prompt, {
+\t\t\t\t\t\tsessionId: fallbackSessionId,
+\t\t\t\t\t\t...execOpts,
+\t\t\t\t\t});
+\t\t\t\t\tif (newSid && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\t\tsetActiveSession(workspace, newSid);
+\t\t\t\t\t\tif (!fallbackSessionId) {
+\t\t\t\t\t\t\tgenerateSessionTitle(workspace, newSid, prompt, result);
+\t\t\t\t\t\t}
+\t\t\t\t\t}
+\t\t\t\t\treturn {
+\t\t\t\t\t\tresult,
+\t\t\t\t\t\tquotaWarning: `⚠️ **模型降级通知**\\n\\n${primaryModel} 欠费，本次已用 auto 完成。\\n\\n> ${e.message.slice(0, 100)}`,
+\t\t\t\t\t};""",
+        """\t\t\t\t\tconst { result, sessionId: newSid, usage } = await execAgent(lockKey, workspace, "auto", prompt, {
+\t\t\t\t\t\tsessionId: fallbackSessionId,
+\t\t\t\t\t\t...execOpts,
+\t\t\t\t\t});
+\t\t\t\t\tif (newSid && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\t\tsetActiveSession(workspace, newSid);
+\t\t\t\t\t\tif (!fallbackSessionId) {
+\t\t\t\t\t\t\tgenerateSessionTitle(workspace, newSid, prompt, result);
+\t\t\t\t\t\t}
+\t\t\t\t\t}
+\t\t\t\t\treturn {
+\t\t\t\t\t\tresult,
+\t\t\t\t\t\tusage,
+\t\t\t\t\t\tquotaWarning: `⚠️ **模型降级通知**\\n\\n${primaryModel} 欠费，本次已用 auto 完成。\\n\\n> ${e.message.slice(0, 100)}`,
+\t\t\t\t\t};""",
+        "runAgent 降级 usage",
+    ),
+]
+for old, new, label in replacements:
+    if old in text:
+        text = text.replace(old, new, 1)
+        changed.append(label)
+
+if changed:
     server.write_text(text)
-    print("patch-claw-runtime-tuning: " + (", ".join(changed) if changed else "server 已更新"))
+    print("patch-claw-runtime-tuning: " + ", ".join(changed))
 else:
     print("patch-claw-runtime-tuning: server.ts 已应用，跳过")
 

@@ -43,6 +43,13 @@ load_config() {
   fi
   : "${CHAT_OPERATOR_OPEN_IDS:?CHAT_OPERATOR_OPEN_IDS 未设置（或设置 ALLOWED_OPERATOR_OPEN_IDS）}"
   : "${AUTHORIZER_OPEN_ID:?AUTHORIZER_OPEN_ID 未设置（唯一授权人 open_id）}"
+  # L1 授权人仅一人；AUTHORIZER_OPEN_IDS 必须与 AUTHORIZER_OPEN_ID 一致（协议群等仅 L2）
+  if [[ -n "${AUTHORIZER_OPEN_IDS:-}" && "${AUTHORIZER_OPEN_IDS}" != "${AUTHORIZER_OPEN_ID}" ]]; then
+    echo "警告: AUTHORIZER_OPEN_IDS 应仅含 L1 授权人，已修正为 AUTHORIZER_OPEN_ID=${AUTHORIZER_OPEN_ID}"
+    AUTHORIZER_OPEN_IDS="${AUTHORIZER_OPEN_ID}"
+  else
+    AUTHORIZER_OPEN_IDS="${AUTHORIZER_OPEN_ID}"
+  fi
   : "${FEISHU_APP_ID:?FEISHU_APP_ID 未设置}"
   : "${FEISHU_APP_SECRET:?FEISHU_APP_SECRET 未设置}"
   : "${CURSOR_API_KEY:?CURSOR_API_KEY 未设置}"
@@ -98,12 +105,25 @@ migrate_legacy_layout() {
 }
 
 install_claw() {
+  local pin_file="${PACK_ROOT}/scripts/claw-upstream-pin.txt"
+  local pin=""
+  if [[ -f "${pin_file}" ]]; then
+    pin="$(tr -d '[:space:]' < "${pin_file}")"
+  fi
+
   if [[ -d "${CLAW_INSTALL_DIR}/.git" ]]; then
     info "Claw 已存在: ${CLAW_INSTALL_DIR}"
   else
     info "克隆 feishu-cursor-claw → ${CLAW_INSTALL_DIR}"
     mkdir -p "$(dirname "${CLAW_INSTALL_DIR}")"
     git clone https://github.com/nongjun/feishu-cursor-claw.git "${CLAW_INSTALL_DIR}"
+  fi
+
+  if [[ -n "${pin}" ]]; then
+    info "锁定上游版本 ${pin:0:12}…"
+    (cd "${CLAW_INSTALL_DIR}" && git fetch origin --depth 50 2>/dev/null || true)
+    (cd "${CLAW_INSTALL_DIR}" && git checkout "${pin}")
+    (cd "${CLAW_INSTALL_DIR}" && git restore server.ts memory.ts 2>/dev/null || true)
   fi
 
   info "安装 Claw 依赖 (bun install)"
@@ -204,7 +224,7 @@ values = {
     "FEISHU_APP_SECRET": "${FEISHU_APP_SECRET}",
     "CURSOR_MODEL": "${CURSOR_MODEL:-composer-2.5}",
     "AUTHORIZER_OPEN_ID": "${AUTHORIZER_OPEN_ID}",
-    "AUTHORIZER_OPEN_IDS": "${AUTHORIZER_OPEN_IDS:-${AUTHORIZER_OPEN_ID}}",
+    "AUTHORIZER_OPEN_IDS": "${AUTHORIZER_OPEN_ID}",
     "AUTHORIZER_NAME": "${AUTHORIZER_NAME:-杨展航}",
     "CHAT_OPERATOR_OPEN_IDS": "${CHAT_OPERATOR_OPEN_IDS}",
     "CHAT_OPERATOR_NAMES": "${CHAT_OPERATOR_NAMES:-}",
@@ -289,6 +309,8 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-group-quiet-reply.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-env-unify.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-permission-grant.sh" || true
+  bash "${PACK_ROOT}/scripts/patch-claw-agent-lifecycle.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-memory-fts-only.sh"
   setup_claw_config
   print_next_steps
 }

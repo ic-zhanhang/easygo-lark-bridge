@@ -29,7 +29,7 @@ replacements = [
 
 // CLAW_AGENT_TIMEOUT: 防止 Agent 挂死长期占锁（合盖/睡眠后子进程常无输出僵死）
 const AGENT_DEFAULT_MAX_MS = 30 * 60 * 1000;
-const AGENT_DEFAULT_IDLE_MS = 3 * 60 * 1000;
+const AGENT_DEFAULT_IDLE_MS = 8 * 60 * 1000; // 空闲=无 stream 输出；正常工具调用会持续刷新
 const HEARTBEAT_AGENT_MAX_MS = 8 * 60 * 1000;
 const HEARTBEAT_AGENT_IDLE_MS = 2 * 60 * 1000;
 

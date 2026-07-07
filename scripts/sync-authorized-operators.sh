@@ -4,7 +4,24 @@ set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_FILE="${PACK_ROOT}/config/easygo.env"
-TEMPLATE="${PACK_ROOT}/templates/runtime/.cursor/rules/authorized-operator.mdc"
+
+if [[ -f "${CONFIG_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${CONFIG_FILE}" 2>/dev/null || true
+fi
+
+PROFILE="${BRIDGE_PROFILE:-mac}"
+if [[ -n "${RUNTIME_TEMPLATE:-}" ]]; then
+  TEMPLATE_ROOT="${RUNTIME_TEMPLATE}"
+elif [[ -d "${PACK_ROOT}/templates/runtime-${PROFILE}" ]]; then
+  TEMPLATE_ROOT="${PACK_ROOT}/templates/runtime-${PROFILE}"
+elif [[ -d "${PACK_ROOT}/templates/runtime" ]]; then
+  TEMPLATE_ROOT="${PACK_ROOT}/templates/runtime"
+else
+  TEMPLATE_ROOT="${PACK_ROOT}/templates/runtime-mac"
+fi
+
+TEMPLATE="${TEMPLATE_ROOT}/.cursor/rules/authorized-operator.mdc"
 TARGET="${RUNTIME_DIR:-${PACK_ROOT}/runtime}/.cursor/rules/authorized-operator.mdc"
 
 if [[ ! -f "${CONFIG_FILE}" ]]; then

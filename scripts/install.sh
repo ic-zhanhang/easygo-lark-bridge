@@ -129,7 +129,8 @@ setup_runtime() {
   mkdir -p "${RUNTIME_DIR}/.cursor/rules"
   rsync -a "${RUNTIME_TEMPLATE}/.cursor/" "${RUNTIME_DIR}/.cursor/"
 
-  bash "${PACK_ROOT}/scripts/sync-authorized-operators.sh"
+  RUNTIME_TEMPLATE="${RUNTIME_TEMPLATE}" RUNTIME_DIR="${RUNTIME_DIR}" \
+    bash "${PACK_ROOT}/scripts/sync-authorized-operators.sh"
 }
 
 setup_runtime_dirs() {

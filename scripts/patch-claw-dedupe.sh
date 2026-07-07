@@ -24,23 +24,13 @@ fi
 
 python3 - "${SERVER}" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 server = Path(sys.argv[1])
 text = server.read_text()
 
-old_basename = '''function basename(p: string): string {
-\tconst parts = p.split("/");
-\treturn parts[parts.length - 1] || p;
-}
-
-// 核心：spawn agent CLI，解析 stream-json，返回结果'''
-
-new_basename = '''function basename(p: string): string {
-\tconst parts = p.split("/");
-\treturn parts[parts.length - 1] || p;
-}
-
+merge_fn = '''
 /** --stream-partial-output 可能重复发送累积全文，合并时避免整段重复追加 */
 function mergeStreamText(current: string, incoming: string): string {
 \tif (!incoming) return current;
@@ -51,36 +41,33 @@ function mergeStreamText(current: string, incoming: string): string {
 \tif (current.endsWith(incoming)) return current;
 \treturn current + incoming;
 }
+'''
 
-// 核心：spawn agent CLI，解析 stream-json，返回结果'''
-
-old_assistant = '''\t\t\t\t\tif (c.type === "text" && c.text) {
-\t\t\t\t\t\tassistantBuf += c.text;
-\t\t\t\t\t\tlastSegment += c.text;
-\t\t\t\t\t}'''
-
-new_assistant = '''\t\t\t\t\tif (c.type === "text" && c.text) {
-\t\t\t\t\t\tassistantBuf = mergeStreamText(assistantBuf, c.text);
-\t\t\t\t\t\tlastSegment = mergeStreamText(lastSegment, c.text);
-\t\t\t\t\t}'''
-
-old_output = '''\t\t\t// 优先取最后一段 assistant 回复（最终结果），避免输出中间过程
-\t\t\tconst finalSegment = strip(lastSegment);
-\t\t\tconst output = finalSegment || resultText || strip(assistantBuf) || strip(stderr) || "(无输出)";'''
-
-new_output = '''\t\t\t// result 事件为最终权威输出；流式片段仅作回退
-\t\t\tconst finalSegment = strip(lastSegment);
-\t\t\tconst output = strip(resultText) || finalSegment || strip(assistantBuf) || strip(stderr) || "(无输出)";'''
-
-for label, old, new in [
-    ("basename block", old_basename, new_basename),
-    ("assistant merge", old_assistant, new_assistant),
-    ("output priority", old_output, new_output),
-]:
-    if old not in text:
-        print(f"patch-claw-dedupe: 无法定位 {label}，请手动检查 server.ts", file=sys.stderr)
+if "function mergeStreamText" not in text:
+    anchor = "// 核心：spawn agent CLI，解析 stream-json，返回结果"
+    if anchor not in text:
+        print("patch-claw-dedupe: 无法定位插入点", file=sys.stderr)
         sys.exit(1)
-    text = text.replace(old, new, 1)
+    text = text.replace(anchor, merge_fn + "\n" + anchor, 1)
+
+text2, n1 = re.subn(
+    r"assistantBuf \+= c\.text;\s*\n(\s*)lastSegment \+= c\.text;",
+    r"assistantBuf = mergeStreamText(assistantBuf, c.text);\n\1lastSegment = mergeStreamText(lastSegment, c.text);",
+    text,
+    count=1,
+)
+if n1 != 1:
+    print("patch-claw-dedupe: 无法定位 assistant merge", file=sys.stderr)
+    sys.exit(1)
+text = text2
+
+old_output = "\t\t\tconst output = finalSegment || resultText || strip(assistantBuf) || strip(stderr) || \"(无输出)\";"
+new_output = "\t\t\t// result 事件为最终权威输出；流式片段仅作回退\n\t\t\tconst output = strip(resultText) || finalSegment || strip(assistantBuf) || strip(stderr) || \"(无输出)\";"
+if old_output in text:
+    text = text.replace(old_output, new_output, 1)
+elif "strip(resultText) || finalSegment" not in text:
+    print("patch-claw-dedupe: 无法定位 output priority", file=sys.stderr)
+    sys.exit(1)
 
 server.write_text(text)
 print("patch-claw-dedupe: 已写入 mergeStreamText 修复")

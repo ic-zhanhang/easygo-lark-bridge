@@ -13,6 +13,22 @@
 
 ## 安装
 
+### 方式 A：Mac 同步（不依赖 Git，在家可用）
+
+Mac 能 `ssh linux-dev` 时：
+
+```bash
+rsync -avz --exclude runtime --exclude claw --exclude 'config/easygo.env' \
+  /Users/ic/workspace/easygo-lark-bridge/ \
+  linux-dev:~/workspace/ic-lark-assistant/
+
+ssh linux-dev 'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"; \
+  cd ~/workspace/ic-lark-assistant && BRIDGE_PROFILE=linux bash scripts/install.sh && \
+  bash scripts/claw-service-linux.sh restart'
+```
+
+### 方式 B：Git clone（GitHub 等，需 Linux 能访问该 Git）
+
 ```bash
 cd ~/workspace
 git clone git@git.standard-robots.com:<你>/easygo-lark-bridge.git ic-lark-assistant

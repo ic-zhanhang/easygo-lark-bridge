@@ -19,19 +19,25 @@ fi
 
 python3 - "${SERVER}" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 server = Path(sys.argv[1])
 text = server.read_text()
 
-hb_old = """const heartbeat = new HeartbeatRunner({
-	config: {
-		enabled: true,
-		everyMs: 30 * 60 * 1000,
-		workspaceDir: defaultWorkspace,
-},"""
+if "CLAW_PROFILE linux" in text:
+    print("patch-claw-profile-linux: 心跳已是 linux 配置，跳过")
+    sys.exit(0)
 
-hb_new = """const heartbeat = new HeartbeatRunner({
+m = re.search(
+    r"const heartbeat = new HeartbeatRunner\(\{\s*config: \{\s*enabled: true,\s*everyMs: \d+ \* 60 \* 1000,\s*workspaceDir: defaultWorkspace,\s*\},",
+    text,
+)
+if not m:
+    print("patch-claw-profile-linux: 无法定位心跳块", file=sys.stderr)
+    sys.exit(1)
+
+replacement = """const heartbeat = new HeartbeatRunner({
 	config: {
 		enabled: true, // CLAW_PROFILE linux: 08–23 点每 2h
 		everyMs: 2 * 60 * 60 * 1000,
@@ -39,24 +45,9 @@ hb_new = """const heartbeat = new HeartbeatRunner({
 		activeHours: { start: 8, end: 23 },
 	},"""
 
-if "CLAW_PROFILE linux" in text:
-    print("patch-claw-profile-linux: 心跳已是 linux 配置，跳过")
-elif hb_old in text:
-    text = text.replace(hb_old, hb_new, 1)
-    print("patch-claw-profile-linux: 已设置 linux 心跳 2h / 08–23")
-elif "CLAW_PROFILE dev" in text:
-    text = text.replace(
-        "enabled: true, // CLAW_PROFILE dev: 10–22 点每 2h",
-        "enabled: true, // CLAW_PROFILE linux: 08–23 点每 2h",
-        1,
-    )
-    text = text.replace("activeHours: { start: 10, end: 22 }", "activeHours: { start: 8, end: 23 }", 1)
-    print("patch-claw-profile-linux: 已从 dev 改为 linux 心跳")
-else:
-    print("patch-claw-profile-linux: 无法定位心跳块，请手动检查 server.ts", file=sys.stderr)
-    sys.exit(1)
-
+text = text[: m.start()] + replacement + text[m.end() :]
 server.write_text(text)
+print("patch-claw-profile-linux: 已设置 linux 心跳 2h / 08–23")
 PY
 
 chmod +x "${BASH_SOURCE[0]}"

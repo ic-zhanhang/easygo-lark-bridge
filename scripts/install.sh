@@ -138,14 +138,22 @@ setup_runtime() {
     local name="$1"
     local target="$2"
     local link="${RUNTIME_DIR}/${name}"
+    local current=""
+    [[ -d "${target}" ]] || die "symlink 目标不存在: ${target}"
+
     if [[ -L "${link}" ]]; then
-      echo "  symlink: ${name}"
+      current="$(readlink "${link}")"
+      if [[ "${current}" == "${target}" ]] && [[ -e "${link}" ]]; then
+        echo "  symlink: ${name} → ${target}"
+        return
+      fi
+      rm -f "${link}"
+      echo "  更新 symlink: ${name}（原 → ${current}）"
     elif [[ -e "${link}" ]]; then
       die "${link} 已存在且不是 symlink"
-    else
-      ln -s "${target}" "${link}"
-      echo "  创建 symlink: ${name} → ${target}"
     fi
+    ln -s "${target}" "${link}"
+    echo "  创建 symlink: ${name} → ${target}"
   }
 
   link_repo "easygo" "${WORKSPACE_ROOT}/easygo"

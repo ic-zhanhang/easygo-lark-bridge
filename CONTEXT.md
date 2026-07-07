@@ -29,3 +29,4 @@
 
 - [docs/集成指南.md](./docs/集成指南.md) — Mac
 - [docs/Linux安装.md](./docs/Linux安装.md) — Linux
+- [docs/话题Agent设计.md](./docs/话题Agent设计.md) — 话题并行、本机存储、使用方式

@@ -1,6 +1,6 @@
 ---
 description: 工作区/Git 状态扫描汇报 — 基线分支、src 子仓库、达妮娅口吻
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Git 状态汇报

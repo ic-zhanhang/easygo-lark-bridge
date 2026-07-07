@@ -1,6 +1,6 @@
 ---
 description: 工作区/Git 状态扫描汇报 — 秧秧口吻
-alwaysApply: true
+alwaysApply: false
 ---
 
 # Git 状态汇报

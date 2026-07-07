@@ -1,6 +1,6 @@
 ---
 description: Interactive Remote Task 完成后的飞书回复格式
-alwaysApply: true
+alwaysApply: false
 ---
 
 # 任务完成回复（Task Completion Reply）

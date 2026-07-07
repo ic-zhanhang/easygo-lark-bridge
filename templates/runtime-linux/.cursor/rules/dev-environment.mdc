@@ -1,6 +1,6 @@
 ---
-description: Linux 开发机环境（秧秧 · 本机）
-alwaysApply: true
+description: Linux 开发机环境（秧秧 · 按需：仿真/SSH/容器）
+alwaysApply: false
 ---
 
 # 开发环境（Linux）

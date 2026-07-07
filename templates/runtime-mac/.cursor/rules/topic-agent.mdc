@@ -1,6 +1,6 @@
 ---
 description: 话题模式 — 本机存储、按需读历史、Git
-alwaysApply: true
+alwaysApply: false
 ---
 
 # 话题模式

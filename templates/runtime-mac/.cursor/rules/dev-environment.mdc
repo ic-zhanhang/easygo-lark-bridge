@@ -1,6 +1,6 @@
 ---
-description: Mac 开发机环境（达妮娅 · 本机）
-alwaysApply: true
+description: Mac 开发机环境（达妮娅 · 按需：仿真/SSH/容器）
+alwaysApply: false
 ---
 
 # 开发环境（Mac）

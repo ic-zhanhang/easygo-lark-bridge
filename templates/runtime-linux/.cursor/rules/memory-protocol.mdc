@@ -1,0 +1,40 @@
+---
+description: 记忆检索 — 仅 topics/文档；用户明确要求读历史时才 search（新对话模式，无 MEMORY.md）
+alwaysApply: false
+---
+
+# 记忆检索（按需）
+
+## 默认行为
+
+- **每条飞书消息是新任务**，不要自动 search、不要读 `.cursor/MEMORY.md`（已停用）。
+- 用户**点名文件/路径** → 只 Read 该路径。
+- 用户说「读历史 / 结合之前 / 读话题记录」→ Read `topics/` 下对应 jsonl。
+
+## 可选：memory-tool（仅用户要查历史或团队文档时）
+
+```bash
+# 在 runtime/ 工作区内执行
+bun "${BRIDGE_ROOT:-../..}/claw/memory-tool.ts" stats
+bun "${BRIDGE_ROOT:-../..}/claw/memory-tool.ts" search "关键词"
+```
+
+索引范围：**仅 `topics/`、`文档/`**（不含 easygo/frontend 源码树）。
+
+## 何时 search
+
+| 场景 | 做法 |
+|------|------|
+| 改代码、查 git、执行命令 | ❌ 不 search |
+| 「在吗」、简单问答 | ❌ 不 search |
+| 用户问「之前聊过什么」 | ✅ search topics 或 Read jsonl |
+| 用户问团队规范 | ✅ search 文档/ 或 Read 具体 md |
+
+## 写入
+
+- **不要**创建或更新 `.cursor/MEMORY.md`。
+- 用户明确「记住这个」→ 可追加 `文档/团队习惯.md` 或用户指定文件。
+
+## 安全
+
+群聊或有他人在场时，不要暴露 topics 里的私人对话内容。

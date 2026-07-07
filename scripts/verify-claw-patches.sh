@@ -43,6 +43,8 @@ PATCHES=(
   patch-claw-permission-grant.sh
   patch-claw-agent-lifecycle.sh
   patch-claw-memory-fts-only.sh
+  patch-claw-memory-scope.sh
+  patch-claw-runtime-tuning.sh
 )
 
 failed=0

@@ -158,6 +158,26 @@ setup_runtime() {
 
   RUNTIME_TEMPLATE="${RUNTIME_TEMPLATE}" RUNTIME_DIR="${RUNTIME_DIR}" \
     bash "${PACK_ROOT}/scripts/sync-authorized-operators.sh"
+
+  if [[ -f "${RUNTIME_TEMPLATE}/AGENTS.md" ]]; then
+    cp "${RUNTIME_TEMPLATE}/AGENTS.md" "${RUNTIME_DIR}/AGENTS.md"
+    echo "  已部署 AGENTS.md（新对话模式）"
+  fi
+
+  # 停用长期记忆文件，避免 Cursor 自动加载
+  if [[ -f "${RUNTIME_DIR}/.cursor/MEMORY.md" ]]; then
+    mv "${RUNTIME_DIR}/.cursor/MEMORY.md" "${RUNTIME_DIR}/.cursor/MEMORY.md.bak.$(date +%Y%m%d)" 2>/dev/null || rm -f "${RUNTIME_DIR}/.cursor/MEMORY.md"
+    echo "  已移除 .cursor/MEMORY.md（新对话模式）"
+  fi
+
+  # 清除全仓索引缓存，服务启动后仅重建 topics/、文档/
+  rm -f "${RUNTIME_DIR}/.memory.sqlite" "${RUNTIME_DIR}/.memory.sqlite-wal" "${RUNTIME_DIR}/.memory.sqlite-shm" 2>/dev/null || true
+
+  # 桥接层不维护 .cursor/memory 日记（保留 heartbeat-state.json 等状态文件）
+  if [[ -d "${RUNTIME_DIR}/.cursor/memory" ]]; then
+    find "${RUNTIME_DIR}/.cursor/memory" -maxdepth 1 -type f -name '*.md' -delete 2>/dev/null || true
+    echo "  已清理 .cursor/memory/*.md（桥接不维护日记）"
+  fi
 }
 
 setup_runtime_dirs() {
@@ -311,6 +331,8 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-permission-grant.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-agent-lifecycle.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-memory-fts-only.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-memory-scope.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-runtime-tuning.sh"
   setup_claw_config
   print_next_steps
 }

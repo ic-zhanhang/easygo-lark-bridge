@@ -34,7 +34,16 @@ Type=simple
 WorkingDirectory=${CLAW_INSTALL_DIR}
 Environment=HOME=${HOME}
 Environment=PATH=${HOME}/.bun/bin:${HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=${BUN_BIN} run ${CLAW_INSTALL_DIR}/start.ts
+# 勿继承 ~/.bashrc 里 Mac 直连代理（192.168.2.1:7897）；内网时会导致飞书 WS 超时
+Environment=http_proxy=
+Environment=https_proxy=
+Environment=all_proxy=
+Environment=HTTP_PROXY=
+Environment=HTTPS_PROXY=
+Environment=ALL_PROXY=
+Environment=no_proxy=artifactory.sr,nexus3.sr,git.standard-robots.com,.sr,192.168.0.0/16,localhost,127.0.0.1,open.feishu.cn,open.larksuite.com
+UnsetEnvironment=http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
+ExecStart=/bin/bash --noprofile --norc -c 'unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY; exec ${BUN_BIN} run ${CLAW_INSTALL_DIR}/start.ts'
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:${LOG_FILE}
@@ -49,10 +58,13 @@ UNIT
 
 cmd_install() {
   echo "安装秧秧 Claw systemd 用户服务..."
+  # 登录 shell 可能把 Mac 直连代理导入 user manager，内网时会弄断飞书 WS
+  systemctl --user unset-environment http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY 2>/dev/null || true
   generate_unit
   systemctl --user daemon-reload
-  systemctl --user enable --now "${UNIT_NAME}"
-  echo "  服务已启用并启动"
+  systemctl --user enable "${UNIT_NAME}"
+  systemctl --user restart "${UNIT_NAME}"
+  echo "  服务已启用并重启"
   echo "  提示: 若希望登出后仍运行，执行: loginctl enable-linger \$USER"
 }
 

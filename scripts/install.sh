@@ -251,6 +251,8 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-group-mention.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-agent-timeout.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-sync.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-cmd.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-bot-openid-retry.sh"
   setup_runtime
   setup_runtime_dirs
   setup_claw_config

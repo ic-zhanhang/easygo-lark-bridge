@@ -4,10 +4,10 @@
 
 ## 双 Bot 部署
 
-| Bot | Profile | 机器 | 模板 | 自启 |
-|-----|---------|------|------|------|
-| **达妮娅** | `mac` | Mac 移动机 | `templates/runtime-mac/` | `claw-service.sh` |
-| **秧秧** | `linux` | Linux 常开主机 | `templates/runtime-linux/` | `claw-service-linux.sh` |
+| Bot | Profile | 机器 | 一句话 | 模板 |
+|-----|---------|------|--------|------|
+| **达妮娅** | `mac` | Mac 移动机 | 私人写码遥控 + 本机 git 同步心跳 | `templates/runtime-mac/` |
+| **秧秧** | `linux` | Linux 常开主机 | 编包 / 仿真主场 + git 同步心跳 | `templates/runtime-linux/` |
 
 同一 git 仓库 clone 两次即可；`FEISHU_APP_ID` 必须不同。职责边界是**本机能做什么**，不是前端/后端分工。
 

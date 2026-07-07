@@ -75,8 +75,24 @@ const heartbeat = new HeartbeatRunner({
 \t\tactiveHours: { start: 10, end: 22 },
 \t},"""
 
+old_profile_linux = """// ── 心跳系统 ──────────────────────────────────────
+const heartbeat = new HeartbeatRunner({
+\tconfig: {
+\t\tenabled: true, // CLAW_PROFILE linux: 08–23 点每 2h
+\t\teveryMs: 2 * 60 * 60 * 1000,
+\t\tworkspaceDir: defaultWorkspace,
+\t\tactiveHours: { start: 8, end: 23 },
+\t},"""
+
+new_block_linux = new_block.replace(
+    "CLAW_PROFILE dev: 10–22 点每 2h",
+    "CLAW_PROFILE linux: 08–23 点每 2h",
+).replace("start: 10, end: 22", "start: 8, end: 23")
+
 if old_profile in text:
     text = text.replace(old_profile, new_block, 1)
+elif old_profile_linux in text:
+    text = text.replace(old_profile_linux, new_block_linux, 1)
 elif old in text:
     text = text.replace(old, new_block.replace("CLAW_PROFILE dev: 10–22 点每 2h\n\t\t", "").replace("everyMs: 2 * 60 * 60 * 1000", "everyMs: 30 * 60 * 1000").replace("\n\t\tactiveHours: { start: 10, end: 22 },", ""), 1)
 else:

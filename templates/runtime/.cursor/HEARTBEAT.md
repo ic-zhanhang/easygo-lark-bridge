@@ -37,7 +37,7 @@ bash ../scripts/sync-dev-repos.sh
 | kinco_driver_ros2 | `easygo/src/kinco_driver_ros2/` | main |
 | navigation2 | `easygo/src/navigation2/` | main |
 | oasis_description | `easygo/src/oasis_description/` | main |
-| oradar_ros | `easygo/src/oradar_ros/` | main |
+| oradar_ros | `easygo/src/oradar_ros/` | **master**（仅此仓） |
 | orbbec_driver_ros2 | `easygo/src/orbbec_driver_ros2/` | main |
 | pager100_lora_bridge | `easygo/src/pager100_lora_bridge/` | main |
 | perception | `easygo/src/perception/` | main |

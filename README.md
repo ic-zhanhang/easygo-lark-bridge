@@ -1,6 +1,9 @@
 # easygo-lark-bridge
 
-EasyGo 飞书遥控 Cursor Agent — **双 Bot、双机**：Mac **达妮娅** + Linux **秧秧**。
+EasyGo 飞书遥控 Cursor Agent — **双 Bot、双机**：
+
+- **达妮娅**（Mac）：移动写码遥控 + 本机 git 同步心跳
+- **秧秧**（Linux）：编包 / 仿真主场 + git 同步心跳
 
 ```
 easygo-lark-bridge/          ← 本 git 仓库

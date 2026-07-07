@@ -35,7 +35,14 @@ load_config() {
   if [[ -z "${ALLOWED_OPERATOR_OPEN_IDS:-}" && -n "${ALLOWED_OPERATOR_OPEN_ID:-}" ]]; then
     ALLOWED_OPERATOR_OPEN_IDS="${ALLOWED_OPERATOR_OPEN_ID}"
   fi
-  : "${ALLOWED_OPERATOR_OPEN_IDS:?ALLOWED_OPERATOR_OPEN_IDS 未设置（逗号分隔多个 open_id）}"
+  if [[ -z "${CHAT_OPERATOR_OPEN_IDS:-}" && -n "${ALLOWED_OPERATOR_OPEN_IDS:-}" ]]; then
+    CHAT_OPERATOR_OPEN_IDS="${ALLOWED_OPERATOR_OPEN_IDS}"
+  fi
+  if [[ -z "${CHAT_OPERATOR_NAMES:-}" && -n "${ALLOWED_OPERATOR_NAMES:-}" ]]; then
+    CHAT_OPERATOR_NAMES="${ALLOWED_OPERATOR_NAMES}"
+  fi
+  : "${CHAT_OPERATOR_OPEN_IDS:?CHAT_OPERATOR_OPEN_IDS 未设置（或设置 ALLOWED_OPERATOR_OPEN_IDS）}"
+  : "${AUTHORIZER_OPEN_ID:?AUTHORIZER_OPEN_ID 未设置（唯一授权人 open_id）}"
   : "${FEISHU_APP_ID:?FEISHU_APP_ID 未设置}"
   : "${FEISHU_APP_SECRET:?FEISHU_APP_SECRET 未设置}"
   : "${CURSOR_API_KEY:?CURSOR_API_KEY 未设置}"
@@ -173,20 +180,34 @@ PY
 }
 
 setup_claw_config() {
-  if [[ ! -f "${CLAW_INSTALL_DIR}/.env" ]]; then
-    cp "${PACK_ROOT}/templates/claw/.env.example" "${CLAW_INSTALL_DIR}/.env"
+  info "Claw 配置：优先使用 config/easygo.env（patch-claw-env-unify）"
+  if [[ -f "${CLAW_INSTALL_DIR}/.env" && ! -L "${CLAW_INSTALL_DIR}/.env" ]]; then
+    if [[ ! -f "${CONFIG_FILE}" ]]; then
+      mv "${CLAW_INSTALL_DIR}/.env" "${CONFIG_FILE}"
+      echo "  已迁移 claw/.env → config/easygo.env"
+    else
+      echo "  保留 config/easygo.env；可删除过时的 claw/.env"
+    fi
+  fi
+  if [[ ! -f "${CONFIG_FILE}" ]]; then
+    cp "${PACK_ROOT}/templates/claw/.env.example" "${CONFIG_FILE}" 2>/dev/null || cp "${CONFIG_EXAMPLE}" "${CONFIG_FILE}"
   fi
 
-  info "合并密钥到 claw/.env"
+  info "合并密钥到 config/easygo.env"
   python3 - <<PY
 from pathlib import Path
-env_path = Path("${CLAW_INSTALL_DIR}/.env")
+env_path = Path("${CONFIG_FILE}")
 lines = env_path.read_text().splitlines() if env_path.exists() else []
 values = {
     "CURSOR_API_KEY": "${CURSOR_API_KEY}",
     "FEISHU_APP_ID": "${FEISHU_APP_ID}",
     "FEISHU_APP_SECRET": "${FEISHU_APP_SECRET}",
     "CURSOR_MODEL": "${CURSOR_MODEL:-composer-2.5}",
+    "AUTHORIZER_OPEN_ID": "${AUTHORIZER_OPEN_ID}",
+    "AUTHORIZER_OPEN_IDS": "${AUTHORIZER_OPEN_IDS:-${AUTHORIZER_OPEN_ID}}",
+    "AUTHORIZER_NAME": "${AUTHORIZER_NAME:-杨展航}",
+    "CHAT_OPERATOR_OPEN_IDS": "${CHAT_OPERATOR_OPEN_IDS}",
+    "CHAT_OPERATOR_NAMES": "${CHAT_OPERATOR_NAMES:-}",
 }
 seen = set()
 out = []
@@ -202,6 +223,8 @@ for key, val in values.items():
         out.append(f"{key}={val}")
 env_path.write_text("\n".join(out) + "\n")
 PY
+  ln -sfn "${CONFIG_FILE}" "${CLAW_INSTALL_DIR}/.env"
+  echo "  claw/.env → config/easygo.env"
 }
 
 print_next_steps() {
@@ -241,6 +264,8 @@ main() {
 
   migrate_legacy_layout
   install_claw
+  setup_runtime
+  setup_runtime_dirs
   bash "${PACK_ROOT}/scripts/patch-claw-dedupe.sh"
   if [[ "${BRIDGE_PROFILE}" == "linux" ]]; then
     bash "${PACK_ROOT}/scripts/patch-claw-profile-linux.sh"
@@ -252,10 +277,16 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-agent-timeout.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-sync.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-cmd.sh"
-  bash "${PACK_ROOT}/scripts/patch-claw-bot-openid-retry.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-bot-openid-retry.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-topic-agent.sh"
-  setup_runtime
-  setup_runtime_dirs
+  bash "${PACK_ROOT}/scripts/patch-claw-group-topic-gate-fix.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-types-after-gate.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-reply-card-retry.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-mention-id-fix.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-permission-gate.sh" || true
+  bash "${PACK_ROOT}/scripts/patch-claw-group-quiet-reply.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-env-unify.sh" || true
+  bash "${PACK_ROOT}/scripts/patch-claw-permission-grant.sh" || true
   setup_claw_config
   print_next_steps
 }

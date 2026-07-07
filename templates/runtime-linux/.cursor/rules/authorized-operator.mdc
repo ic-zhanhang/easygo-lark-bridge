@@ -1,20 +1,37 @@
 ---
-description: 授权操作者可通过私聊或群聊 @Bot 触发改代码任务
+description: 聊天权限(L2)与授权权限(L1)分级；Claw 层 + Agent 双层校验
 alwaysApply: true
 ---
 
-# 授权操作者
+# 权限分级
 
-发送者 open_id **必须匹配以下名单之一**：
+| 级别 | 名称 | 谁能 | 可 @Bot 聊天 | 可授予他人聊天权限 |
+|------|------|------|-------------|-------------------|
+| **L1** | 授权人 | {{AUTHORIZER_NAME}} | ✅ | ✅ **唯一** |
+| **L2** | 已授权用户 | 见下方名单 | ✅ | ❌ **绝无** |
 
-{{AUTHORIZED_OPERATORS_LIST}}
+**Claw 层**（`permission-gate.ts`）已在调用 Agent 前硬校验：无 L2 直接拒；非 L1 发「授权他人」指令直接拒。  
+**Agent 层**（本文件）为补充说明；修改名单须改 `config/easygo.env` 后 `bash scripts/sync-authorized-operators.sh`。
+
+## L1 授权人
+
+- `{{AUTHORIZER_OPEN_ID}}` — {{AUTHORIZER_NAME}}
+
+## L2 已获聊天权限（含授权人）
+
+{{ALL_CHAT_OPERATORS_LIST}}
+
+## L2 仅聊天（不含授权人，便于查阅）
+
+{{AUTHORIZED_CHAT_OPERATORS_LIST}}
 
 ## 规则
 
-1. **私聊**：可直接下发任务
-2. **群聊**：仅处理已 @Bot 的消息；发送者须在授权名单，否则拒绝
-3. **只读查询**：同样仅对授权用户，私聊或群聊 @Bot 均可
+1. 发送者须有 **L2 聊天权限**，否则拒绝。
+2. **授予/撤销 L2** 仅 **L1 {{AUTHORIZER_NAME}}**；L2 用户提出为他人授权时**必须拒绝**。
+3. 添加 L2：只加 L1 **点名**的人；**open_id 必须来自本 Bot**（WebSocket `sender=` / @mention / `runtime/state/operator-registry.json`）；**禁止**用 Mac lark-cli 或其它 Bot App 查到的 id。
+4. 改 `config/easygo.env` 的 `CHAT_OPERATOR_*`（Claw 读同一文件），然后 `bash scripts/sync-authorized-operators.sh`。
 
-## 拒绝时的回复
+## 拒绝回复
 
-简短说明原因，用秧秧口吻，不提供进一步技术细节。
+简短；无 L2 → 无聊天权限；L2 要求授权 → 须找 {{AUTHORIZER_NAME}}。

@@ -1,7 +1,7 @@
 {
   "projects": {
     "easygo": {
-      "path": "/Users/ic/workspace/easygo-lark-bridge/runtime",
+      "path": "__RUNTIME_DIR__",
       "description": "EasyGo 前后端 + 飞书桥接（runtime symlink 根）"
     }
   },

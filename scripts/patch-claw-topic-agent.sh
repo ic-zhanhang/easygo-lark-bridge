@@ -261,21 +261,19 @@ disp_old = """\t\t\tconst mentions = (msg.mentions as FeishuMention[] | undefine
 disp_new = """\t\t\tconst mentions = (msg.mentions as FeishuMention[] | undefined) ?? [];
 \t\t\tconst threadId = (msg.thread_id as string | undefined) || undefined;
 
-\t\t\tif (isDup(messageId)) return;
-
-\t\t\tif (chatType === "group" && !threadId) {
-\t\t\t\tconsole.log("[群聊] 忽略：无话题 thread_id");
-\t\t\t\tawait replyCard(messageId, "请在**话题**里 @我，我才能处理这条消息。", { title: "请使用话题", color: "orange" });
-\t\t\t\treturn;
-\t\t\t}"""
+\t\t\tif (isDup(messageId)) return;"""
 
 if disp_old not in text:
     print("patch-claw-topic-agent: 无法定位 dispatcher", file=sys.stderr)
     sys.exit(1)
 text = text.replace(disp_old, disp_new, 1)
 
-handle_invoke_old = """\t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);
-\t\t\thandle({ text: parsedText.trim(), messageId, chatId, chatType, messageType, content, senderOpenId }).catch(console.error);"""
+handle_invoke_old = """\t\t\t\tparsedText = stripMentionPlaceholders(parsedText, mentions);
+\t\t\t}
+
+\t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);"""
+
+# topic-agent patch 在 group-mention 之后运行，gate 由 patch-claw-group-topic-gate-fix 注入
 
 handle_invoke_new = """\t\t\tconst topicKey = TopicAgent.getTopicKey(chatType, threadId, senderOpenId);
 \t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} thread=${threadId?.slice(0, 12) ?? "-"} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);

@@ -26,6 +26,7 @@ PATCHES=(
   patch-claw-profile-linux.sh
   patch-claw-no-resume.sh
   patch-claw-group-mention.sh
+  patch-claw-hide-sender-openid.sh
   patch-claw-agent-timeout.sh
   patch-claw-heartbeat-sync.sh
   patch-claw-heartbeat-cmd.sh

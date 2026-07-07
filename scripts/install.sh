@@ -314,6 +314,7 @@ main() {
   fi
   bash "${PACK_ROOT}/scripts/patch-claw-no-resume.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-group-mention.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-hide-sender-openid.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-agent-timeout.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-sync.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-cmd.sh"

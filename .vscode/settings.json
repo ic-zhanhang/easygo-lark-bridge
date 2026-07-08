@@ -1,0 +1,6 @@
+{
+  "git.ignoredRepositories": [
+    "${workspaceFolder}/claw",
+    "${workspaceFolder}/runtime"
+  ]
+}

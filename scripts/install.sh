@@ -107,19 +107,50 @@ migrate_legacy_layout() {
 install_claw() {
   local pin_file="${PACK_ROOT}/scripts/claw-upstream-pin.txt"
   local pin=""
+  local pin_marker="${CLAW_INSTALL_DIR}/.upstream-pin"
+  local installed_pin=""
   if [[ -f "${pin_file}" ]]; then
     pin="$(tr -d '[:space:]' < "${pin_file}")"
   fi
-
-  if [[ -d "${CLAW_INSTALL_DIR}/.git" ]]; then
-    info "Claw 已存在: ${CLAW_INSTALL_DIR}"
-  else
-    info "克隆 feishu-cursor-claw → ${CLAW_INSTALL_DIR}"
-    mkdir -p "$(dirname "${CLAW_INSTALL_DIR}")"
-    git clone https://github.com/nongjun/feishu-cursor-claw.git "${CLAW_INSTALL_DIR}"
+  if [[ -f "${pin_marker}" ]]; then
+    installed_pin="$(tr -d '[:space:]' < "${pin_marker}")"
   fi
 
-  if [[ -n "${pin}" ]]; then
+  local need_fresh=false
+  if [[ ! -f "${CLAW_INSTALL_DIR}/package.json" ]]; then
+    need_fresh=true
+  elif [[ -n "${pin}" && -n "${installed_pin}" && "${installed_pin}" != "${pin}" ]]; then
+    info "上游 pin 变更 (${installed_pin:0:12} → ${pin:0:12})，重建 claw"
+    need_fresh=true
+  fi
+
+  if [[ "${need_fresh}" == "true" ]]; then
+    info "克隆 feishu-cursor-claw → ${CLAW_INSTALL_DIR}"
+    local claw_backup=""
+    if [[ -d "${CLAW_INSTALL_DIR}" ]]; then
+      claw_backup="$(mktemp -d /tmp/claw-backup.XXXXXX)"
+      cp -a "${CLAW_INSTALL_DIR}/." "${claw_backup}/"
+    fi
+    rm -rf "${CLAW_INSTALL_DIR}"
+    mkdir -p "$(dirname "${CLAW_INSTALL_DIR}")"
+    if ! git clone https://github.com/nongjun/feishu-cursor-claw.git "${CLAW_INSTALL_DIR}"; then
+      if [[ -n "${claw_backup}" && -f "${claw_backup}/package.json" ]]; then
+        mkdir -p "${CLAW_INSTALL_DIR}"
+        cp -a "${claw_backup}/." "${CLAW_INSTALL_DIR}/"
+        rm -rf "${claw_backup}"
+        die "克隆 claw 失败，已恢复本地副本；请检查网络后重试 install"
+      fi
+      rm -rf "${claw_backup}"
+      die "克隆 claw 失败: ${CLAW_INSTALL_DIR}"
+    fi
+    rm -rf "${claw_backup}"
+  elif [[ -d "${CLAW_INSTALL_DIR}/.git" ]]; then
+    info "Claw 已存在: ${CLAW_INSTALL_DIR}"
+  else
+    info "Claw 已存在（补丁工作副本）: ${CLAW_INSTALL_DIR}"
+  fi
+
+  if [[ -n "${pin}" && -d "${CLAW_INSTALL_DIR}/.git" ]]; then
     info "锁定上游版本 ${pin:0:12}…"
     (cd "${CLAW_INSTALL_DIR}" && git fetch origin --depth 50 2>/dev/null || true)
     (cd "${CLAW_INSTALL_DIR}" && git checkout "${pin}")
@@ -128,6 +159,21 @@ install_claw() {
 
   info "安装 Claw 依赖 (bun install)"
   (cd "${CLAW_INSTALL_DIR}" && bun install)
+}
+
+finalize_claw_install() {
+  local pin_file="${PACK_ROOT}/scripts/claw-upstream-pin.txt"
+  local pin=""
+  if [[ -f "${pin_file}" ]]; then
+    pin="$(tr -d '[:space:]' < "${pin_file}")"
+  fi
+  if [[ -n "${pin}" && -d "${CLAW_INSTALL_DIR}" ]]; then
+    echo "${pin}" > "${CLAW_INSTALL_DIR}/.upstream-pin"
+  fi
+  if [[ -d "${CLAW_INSTALL_DIR}/.git" ]]; then
+    rm -rf "${CLAW_INSTALL_DIR}/.git"
+    info "已移除 claw/.git（补丁由 scripts/ 维护，避免 IDE 嵌套 git 视图）"
+  fi
 }
 
 setup_runtime() {
@@ -364,6 +410,7 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-memory-scope.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-runtime-tuning.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-agent-startup-grace.sh"
+  finalize_claw_install
   setup_claw_config
   print_next_steps
 }

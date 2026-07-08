@@ -1,6 +1,8 @@
 {
-  "git.ignoredRepositories": [
-    "${workspaceFolder}/claw",
-    "${workspaceFolder}/runtime"
+  "git.autoRepositoryDetection": false,
+  "git.repositoryScanIgnoredFolders": [
+    "claw",
+    "runtime",
+    "node_modules"
   ]
 }

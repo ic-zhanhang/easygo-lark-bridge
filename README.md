@@ -28,7 +28,7 @@ bash scripts/claw-service.sh install   # launchd
 ## Linux（秧秧）
 
 ```bash
-git clone <本仓库> ~/workspace/ic-lark-assistant
+git clone <本仓库> ~/workspace/easygo-lark-bridge
 cp config/easygo.env.linux.example config/easygo.env
 bash scripts/install-linux.sh
 bash scripts/claw-service-linux.sh install   # systemd

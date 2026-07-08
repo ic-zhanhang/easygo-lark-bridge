@@ -20,10 +20,10 @@ Mac 能 `ssh linux-dev` 时：
 ```bash
 rsync -avz --exclude runtime --exclude claw --exclude 'config/easygo.env' \
   /Users/ic/workspace/easygo-lark-bridge/ \
-  linux-dev:~/workspace/ic-lark-assistant/
+  linux-dev:~/workspace/easygo-lark-bridge/
 
 ssh linux-dev 'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"; \
-  cd ~/workspace/ic-lark-assistant && BRIDGE_PROFILE=linux bash scripts/install.sh && \
+  cd ~/workspace/easygo-lark-bridge && BRIDGE_PROFILE=linux bash scripts/install.sh && \
   bash scripts/claw-service-linux.sh restart'
 ```
 
@@ -31,8 +31,8 @@ ssh linux-dev 'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"; \
 
 ```bash
 cd ~/workspace
-git clone git@git.standard-robots.com:<你>/easygo-lark-bridge.git ic-lark-assistant
-cd ic-lark-assistant
+git clone git@github.com:ic-zhanhang/easygo-lark-bridge.git easygo-lark-bridge
+cd easygo-lark-bridge
 
 cp config/easygo.env.linux.example config/easygo.env
 # 填写 FEISHU_APP_SECRET、CURSOR_API_KEY、ALLOWED_OPERATOR_OPEN_IDS
@@ -74,7 +74,7 @@ bash scripts/claw-service-linux.sh logs
 Mac 改完 push 后，在 Linux 执行（**标准流程，见 `.cursor/rules/deploy-workflow.mdc`**）：
 
 ```bash
-cd ~/workspace/ic-lark-assistant
+cd ~/workspace/easygo-lark-bridge
 git pull
 BRIDGE_PROFILE=linux bash scripts/install.sh
 bash scripts/claw-service-linux.sh restart

@@ -36,14 +36,14 @@ Mac 能 SSH 时（内网 `linux-dev` 或直连 `linux-dev-direct`）：
 
 ```bash
 ssh linux-dev 'export PATH="$HOME/.bun/bin:$HOME/.local/bin:$PATH"; \
-  cd ~/workspace/ic-lark-assistant && \
+  cd ~/workspace/easygo-lark-bridge && \
   git pull && \
   BRIDGE_PROFILE=linux bash scripts/install.sh && \
   bash scripts/claw-service-linux.sh restart && \
   bash scripts/claw-service-linux.sh status'
 ```
 
-Linux 仓库路径固定：`~/workspace/ic-lark-assistant`（不是 `easygo-lark-bridge`）。
+Linux 仓库路径与 Mac 一致：`~/workspace/easygo-lark-bridge`。
 
 ### 4. 验证
 
@@ -55,7 +55,7 @@ Linux 仓库路径固定：`~/workspace/ic-lark-assistant`（不是 `easygo-lark
 | Bot | 机器 | Profile | 路径 |
 |-----|------|---------|------|
 | 达妮娅 | Mac | `mac` | `~/workspace/easygo-lark-bridge` |
-| 秧秧 | Linux | `linux` | `~/workspace/ic-lark-assistant` |
+| 秧秧 | Linux | `linux` | `~/workspace/easygo-lark-bridge` |
 
 - 两台 **FEISHU_APP_ID 必须不同**；open_id 也各 Bot 独立，授权/sync 按本机 `config/easygo.env` 的 `BRIDGE_PROFILE`。
 - 仅改 Mac 本地 env/密钥：不必 push；仅改脚本/模板/补丁：**必须 push + Linux pull + install**。

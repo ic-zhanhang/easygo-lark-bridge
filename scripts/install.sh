@@ -158,6 +158,27 @@ setup_runtime() {
 
   link_repo "easygo" "${WORKSPACE_ROOT}/easygo"
   link_repo "frontend" "${WORKSPACE_ROOT}/standard-fe/easygo"
+
+  # workspace 根级 frontend 别名：Agent/SSH 若写 ~/workspace/frontend/ 仍落到 git 仓库
+  local frontend_alias="${WORKSPACE_ROOT}/frontend"
+  local frontend_repo="${WORKSPACE_ROOT}/standard-fe/easygo"
+  if [[ -L "${frontend_alias}" ]]; then
+    local alias_target
+    alias_target="$(readlink "${frontend_alias}")"
+    if [[ "${alias_target}" != "${frontend_repo}" ]]; then
+      rm -f "${frontend_alias}"
+      ln -s "${frontend_repo}" "${frontend_alias}"
+      echo "  更新 workspace 别名: frontend → ${frontend_repo}"
+    else
+      echo "  workspace 别名: frontend → ${frontend_repo}"
+    fi
+  elif [[ -e "${frontend_alias}" ]]; then
+    echo "  ⚠️ ${frontend_alias} 已存在且非 symlink，跳过（请人工合并到 ${frontend_repo} 后删除）"
+  else
+    ln -s "${frontend_repo}" "${frontend_alias}"
+    echo "  创建 workspace 别名: frontend → ${frontend_repo}"
+  fi
+
   # 不要 symlink bridge → 仓库根：会形成 runtime/bridge/runtime 无限循环，拖死记忆索引
 
   info "部署 runtime .cursor 模板 (${BRIDGE_PROFILE}: ${RUNTIME_TEMPLATE})"

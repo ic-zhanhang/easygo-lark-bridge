@@ -10,7 +10,13 @@ alwaysApply: true
 | 目录 | 实际 repo |
 |------|-----------|
 | `easygo/` | EasyGo 后端 |
-| `frontend/` | EasyGo 前端 |
+| `frontend/` | EasyGo 前端（`~/workspace/standard-fe/easygo`） |
+
+## 路径解析（易错）
+
+- **runtime 内**写文件用相对路径 `frontend/docs/...`（symlink 已指向 git 仓库）
+- **禁止**在 `~/workspace/frontend/` 单独建目录——该路径应为指向 `standard-fe/easygo` 的别名 symlink
+- SSH/脚本/绝对路径一律用 `~/workspace/standard-fe/easygo` 或 `runtime/frontend`
 
 ## 必须遵守
 

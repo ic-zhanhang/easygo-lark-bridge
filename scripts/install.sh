@@ -363,6 +363,7 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-memory-fts-only.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-memory-scope.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-runtime-tuning.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-agent-startup-grace.sh"
   setup_claw_config
   print_next_steps
 }

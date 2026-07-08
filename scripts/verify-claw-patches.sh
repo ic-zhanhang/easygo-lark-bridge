@@ -46,6 +46,7 @@ PATCHES=(
   patch-claw-memory-fts-only.sh
   patch-claw-memory-scope.sh
   patch-claw-runtime-tuning.sh
+  patch-claw-agent-startup-grace.sh
 )
 
 failed=0

@@ -40,6 +40,7 @@ PATCHES=(
   patch-claw-bot-openid-retry.sh
   patch-claw-permission-gate.sh
   patch-claw-group-quiet-reply.sh
+  patch-claw-progress-done-guard.sh
   patch-claw-env-unify.sh
   patch-claw-permission-grant.sh
   patch-claw-agent-lifecycle.sh

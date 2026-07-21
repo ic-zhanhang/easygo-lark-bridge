@@ -64,12 +64,56 @@ export function shouldAttachTopicHistory(chatType: string, prompt: string): bool
 	return shouldLoadTopicHistory(prompt);
 }
 
-export function topicHistoryPromptSuffix(workspace: string, topicKey: string): string {
-	const path = getTopicFilePath(workspace, topicKey);
-	if (!existsSync(path)) {
-		return "\n\n[话题记录] 本地尚无历史文件。";
+/** 内联进 Agent prompt 的话题上下文上限（字符），超长则保留最近部分 */
+export const TOPIC_CONTEXT_MAX_CHARS = 60_000;
+
+function formatTopicHistoryInline(workspace: string, topicKey: string): string {
+	const file = getTopicFilePath(workspace, topicKey);
+	if (!existsSync(file)) return "（本地尚无历史）";
+	const lines = readFileSync(file, "utf-8").split("\n").filter((l) => l.trim());
+	const blocks: string[] = [];
+	for (const line of lines) {
+		try {
+			const e = JSON.parse(line) as TopicMessageRecord;
+			const who = e.role === "user" ? "用户" : "Bot";
+			const img = e.image_path ? `\n[图片: ${e.image_path}]` : "";
+			const text = (e.text || "").trim();
+			if (!text && !e.image_path) continue;
+			blocks.push(`[${who}] ${text}${img}`);
+		} catch {
+			/* skip bad line */
+		}
 	}
-	return `\n\n[话题记录文件] ${path}\n请读取该文件作为本话题上下文（含用户 @ 与 Bot 回复、图片本地路径）。`;
+	let body = blocks.join("\n\n");
+	if (body.length > TOPIC_CONTEXT_MAX_CHARS) {
+		body = body.slice(body.length - TOPIC_CONTEXT_MAX_CHARS);
+		const cut = body.indexOf("\n\n[");
+		if (cut > 0 && cut < 800) body = body.slice(cut + 2);
+		body = `…（较早记录已截断）\n\n${body}`;
+	}
+	return body || "（本地尚无有效历史条目）";
+}
+
+/**
+ * 把本话题历史直接注入 prompt（不依赖 Agent 再 Read）。
+ * 从根本上保证：每次任务只带当前话题上下文，不附其它话题。
+ */
+export function topicHistoryPromptSuffix(workspace: string, topicKey: string): string {
+	const file = getTopicFilePath(workspace, topicKey);
+	const body = formatTopicHistoryInline(workspace, topicKey);
+	return `
+
+[本话题上下文 — 唯一有效对话历史]
+归档文件: ${file}
+硬性规则：
+1. 仅依据下方本话题记录 + 当前用户消息理解意图并回复。
+2. 禁止读取其它 topics/*.jsonl、MEMORY、agent-transcripts、其它群聊/私聊记录来补充「对话上下文」。
+3. 下文已内联本话题全文（过长则截断较早部分）；无需再 Read 该 jsonl，除非用户明确要求核对原文。
+4. 查代码/文档/跑命令仍按任务需要；那不属于「对话上下文」。
+
+${body}
+
+[本话题上下文结束]`;
 }
 
 const activeTopicSlots = new Set<string>();

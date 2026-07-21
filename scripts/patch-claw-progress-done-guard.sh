@@ -63,7 +63,7 @@ start_variants = [
 \t\t\t}
 \t\t: undefined;""",
 ]
-start_new = """\tconst onStart = cardId && !isGroup
+start_new = """\tconst onStart = cardId
 \t\t? () => {
 \t\t\t\tif (!progressEnabled) return;
 \t\t\t\tenqueueCardUpdate(`⏳ 正在执行...\\n\\n> ${text.slice(0, 120)}`, {
@@ -83,6 +83,18 @@ for v in start_variants:
 
 # ── 3) onProgress：progressEnabled + enqueueCardUpdate ──
 prog_variants = [
+    """\tconst onProgress = cardId
+\t\t? (p: AgentProgress) => {
+\t\t\t\tconst time = formatElapsed(p.elapsed);
+\t\t\t\tconst phaseLabel = p.phase === "thinking" ? "🤔 思考中" : p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
+\t\t\t\tconst snippet = p.snippet.split("\\n").filter((l) => l.trim()).slice(-4).join("\\n");
+\t\t\t\tupdateCard(
+\t\t\t\t\tcardId!,
+\t\t\t\t\t`\\`\\`\\`\\n${snippet.slice(0, 300) || "..."}\\n\\`\\`\\``,
+\t\t\t\t\t{ title: `${phaseLabel} · ${time}`, color: "wathet" },
+\t\t\t\t).catch(() => {});
+\t\t\t}
+\t\t: undefined;""",
     """\tconst onProgress = cardId
 \t\t? (p: AgentProgress) => {
 \t\t\t\t// CLAW_PROGRESS_QUIET: 思考阶段不刷新卡片，完成后一次性回复
@@ -112,12 +124,12 @@ prog_variants = [
 \t\t\t}
 \t\t: undefined;""",
 ]
-prog_new = """\tconst onProgress = cardId && !isGroup
+prog_new = """\tconst onProgress = cardId
 \t\t? (p: AgentProgress) => {
-\t\t\t\t// CLAW_PROGRESS_DONE_GUARD + CLAW_PROGRESS_QUIET
-\t\t\t\tif (!progressEnabled || p.phase === "thinking") return;
+\t\t\t\t// CLAW_PROGRESS_DONE_GUARD: 完成后忽略迟到 progress；保留思考中进度
+\t\t\t\tif (!progressEnabled) return;
 \t\t\t\tconst time = formatElapsed(p.elapsed);
-\t\t\t\tconst phaseLabel = p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
+\t\t\t\tconst phaseLabel = p.phase === "thinking" ? "🤔 思考中" : p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
 \t\t\t\tconst snippet = p.snippet.split("\\n").filter((l) => l.trim()).slice(-4).join("\\n");
 \t\t\t\tenqueueCardUpdate(
 \t\t\t\t\t`\\`\\`\\`\\n${snippet.slice(0, 300) || "..."}\\n\\`\\`\\``,

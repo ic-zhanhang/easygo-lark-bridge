@@ -38,7 +38,7 @@ bash scripts/claw-service-linux.sh install   # systemd
 
 ## 使用
 
-飞书群 @达妮娅 或 @秧秧；每条消息独立任务，不续聊。
+飞书群**话题**内 @达妮娅 或 @秧秧；同话题续聊（Topic Session）。`/新对话` 或 `/reset` 重置当前话题会话。
 
 | Bot | 机器 | 日志 |
 |-----|------|------|

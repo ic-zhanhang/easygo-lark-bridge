@@ -1,22 +1,22 @@
 ---
-description: 飞书单条消息任务 — 不预扫、不续聊
+description: Topic Session 内续聊；禁止未要求时预扫全仓
 alwaysApply: true
 ---
 
-# 单条消息任务
+# 单任务范围（Topic Session）
 
-飞书每条 @ 消息是**独立任务**（Claw 不 `--resume`）。
+飞书群话题内同 thread 的 @ 进入**同一 Topic Session**（可续聊）。不同话题、心跳、出站通知互不共享会话。
 
 ## 必须
 
-1. **只根据当前用户消息**（群话题另加 prompt 内已注入的本话题上下文）理解意图并执行
+1. **根据当前用户消息**理解意图并执行；可沿用本会话已有上下文
 2. 需要读文件/跑命令时，**限定在用户点名的模块或路径**
-3. 用户未要求时，**不要**主动全仓 `git status`、扫所有子仓库、读 CI、翻群聊
+3. 用户未要求时，**不要**主动全仓 `git status`、扫所有子仓库、读 CI、翻群聊旁路日志
 
 ## 禁止
 
-- 不要假设「接着上次飞书对话」——没有上次
+- **不要**假设跨话题或跨私聊续聊
 - **不要**主动读 `.cursor/MEMORY.md`（已停用）或 `.cursor/memory/` 日记
-- **群聊话题**：对话上下文以 prompt 内已注入的「本话题上下文」为准；禁止再读其它 `topics/*.jsonl` 或 agent-transcripts 补上下文
-- 不要为了「全面了解」而遍历 `easygo/src/*/` 全部子仓或对 bridge 全仓 Grep
+- **不要**主动读 `runtime/topics/*.jsonl`
+- 不要为了「全面了解」而遍历 `easygo/src/*/` 全部子仓或对 `easygo-lark-bridge` 全仓 Grep
 - 心跳任务（`[心跳检查]`）除外，按 `HEARTBEAT.md`

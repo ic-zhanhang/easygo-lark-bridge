@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Agent 完成后禁止 onProgress 再改卡片，并串行化卡片更新，避免「完成」被「执行工具」覆盖
-# 群聊/私聊均显示中间态，含「🤔 思考中」
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -45,7 +44,7 @@ if anchor not in text:
     sys.exit(1)
 text = text.replace(anchor, insert, 1)
 
-# ── 2) onStart：enqueue（群聊/私聊均启用）──
+# ── 2) onStart：enqueue + isGroup 兼容 ──
 start_variants = [
     """\tconst onStart = cardId
 \t\t? () => {
@@ -64,7 +63,7 @@ start_variants = [
 \t\t\t}
 \t\t: undefined;""",
 ]
-start_new = """\tconst onStart = cardId
+start_new = """\tconst onStart = cardId && !isGroup
 \t\t? () => {
 \t\t\t\tif (!progressEnabled) return;
 \t\t\t\tenqueueCardUpdate(`⏳ 正在执行...\\n\\n> ${text.slice(0, 120)}`, {
@@ -82,12 +81,14 @@ for v in start_variants:
         text = text.replace(v, start_new, 1)
         break
 
-# ── 3) onProgress：含思考中 ──
+# ── 3) onProgress：progressEnabled + enqueueCardUpdate ──
 prog_variants = [
     """\tconst onProgress = cardId
 \t\t? (p: AgentProgress) => {
+\t\t\t\t// CLAW_PROGRESS_QUIET: 思考阶段不刷新卡片，完成后一次性回复
+\t\t\t\tif (p.phase === "thinking") return;
 \t\t\t\tconst time = formatElapsed(p.elapsed);
-\t\t\t\tconst phaseLabel = p.phase === "thinking" ? "🤔 思考中" : p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
+\t\t\t\tconst phaseLabel = p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
 \t\t\t\tconst snippet = p.snippet.split("\\n").filter((l) => l.trim()).slice(-4).join("\\n");
 \t\t\t\tupdateCard(
 \t\t\t\t\tcardId!,
@@ -110,27 +111,13 @@ prog_variants = [
 \t\t\t\t).catch(() => {});
 \t\t\t}
 \t\t: undefined;""",
-    """\tconst onProgress = cardId
+]
+prog_new = """\tconst onProgress = cardId && !isGroup
 \t\t? (p: AgentProgress) => {
-\t\t\t\t// CLAW_PROGRESS_QUIET: 思考阶段不刷新卡片，完成后一次性回复
-\t\t\t\tif (p.phase === "thinking") return;
+\t\t\t\t// CLAW_PROGRESS_DONE_GUARD + CLAW_PROGRESS_QUIET
+\t\t\t\tif (!progressEnabled || p.phase === "thinking") return;
 \t\t\t\tconst time = formatElapsed(p.elapsed);
 \t\t\t\tconst phaseLabel = p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
-\t\t\t\tconst snippet = p.snippet.split("\\n").filter((l) => l.trim()).slice(-4).join("\\n");
-\t\t\t\tupdateCard(
-\t\t\t\t\tcardId!,
-\t\t\t\t\t`\\`\\`\\`\\n${snippet.slice(0, 300) || "..."}\\n\\`\\`\\``,
-\t\t\t\t\t{ title: `${phaseLabel} · ${time}`, color: "wathet" },
-\t\t\t\t).catch(() => {});
-\t\t\t}
-\t\t: undefined;""",
-]
-prog_new = """\tconst onProgress = cardId
-\t\t? (p: AgentProgress) => {
-\t\t\t\t// CLAW_PROGRESS_DONE_GUARD: 含思考中状态
-\t\t\t\tif (!progressEnabled) return;
-\t\t\t\tconst time = formatElapsed(p.elapsed);
-\t\t\t\tconst phaseLabel = p.phase === "thinking" ? "🤔 思考中" : p.phase === "tool_call" ? "🔧 执行工具" : "💬 回复中";
 \t\t\t\tconst snippet = p.snippet.split("\\n").filter((l) => l.trim()).slice(-4).join("\\n");
 \t\t\t\tenqueueCardUpdate(
 \t\t\t\t\t`\\`\\`\\`\\n${snippet.slice(0, 300) || "..."}\\n\\`\\`\\``,
@@ -148,30 +135,48 @@ for v in prog_variants:
         break
 
 # ── 4) runAgent 返回后：等待队列、关闭 progress ──
-# 注意：本 patch 在 runtime-tuning 之前执行，此时尚无 usage 解构
 after_agent_variants = [
-    """\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+    # Topic Session + resultWithNote（无 usage，在 runtime-tuning 之前）
+    (
+        """\t\tconst { result, quotaWarning, sessionRenewed } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+\t\tconst resultWithNote = sessionRenewed
+\t\t\t? `⚠️ 原 Topic Session 无法续聊，已自动开启新会话。\\n\\n${result}`
+\t\t\t: result;
 \t\tconst usedModel = quotaWarning ? "auto" : model;""",
-    """\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart });
+        """\t\tconst { result, quotaWarning, sessionRenewed } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+\t\tconst resultWithNote = sessionRenewed
+\t\t\t? `⚠️ 原 Topic Session 无法续聊，已自动开启新会话。\\n\\n${result}`
+\t\t\t: result;
+\t\tprogressEnabled = false;
+\t\tif (cardId) await cardUpdateChain.catch(() => {});
 \t\tconst usedModel = quotaWarning ? "auto" : model;""",
+    ),
+    (
+        """\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+\t\tconst usedModel = quotaWarning ? "auto" : model;""",
+        """\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+\t\tprogressEnabled = false;
+\t\tif (cardId) await cardUpdateChain.catch(() => {});
+\t\tconst usedModel = quotaWarning ? "auto" : model;""",
+    ),
+    (
+        """\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+\t\tconst usedModel = quotaWarning ? "auto" : model;""",
+        """\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
+\t\tprogressEnabled = false;
+\t\tif (cardId) await cardUpdateChain.catch(() => {});
+\t\tconst usedModel = quotaWarning ? "auto" : model;""",
+    ),
 ]
-
-after_agent_new_by_old = {
-    after_agent_variants[0]: """\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });
-\t\tprogressEnabled = false;
-\t\tif (cardId) await cardUpdateChain.catch(() => {});
-\t\tconst usedModel = quotaWarning ? "auto" : model;""",
-    after_agent_variants[1]: """\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart });
-\t\tprogressEnabled = false;
-\t\tif (cardId) await cardUpdateChain.catch(() => {});
-\t\tconst usedModel = quotaWarning ? "auto" : model;""",
-}
-
-matched = next((v for v in after_agent_variants if v in text), None)
-if matched is None:
+matched = False
+for after_agent, after_agent_new in after_agent_variants:
+    if after_agent in text:
+        text = text.replace(after_agent, after_agent_new, 1)
+        matched = True
+        break
+if not matched:
     print("patch-claw-progress-done-guard: 未找到 runAgent 完成锚点", file=sys.stderr)
     sys.exit(1)
-text = text.replace(matched, after_agent_new_by_old[matched], 1)
 
 # ── 5) 格式重试不再刷 progress 中间态 ──
 retry_old = "\t\t\t\tconst { result: retryResult } = await runAgent(workspace, retryPrompt, { onProgress });"
@@ -180,7 +185,7 @@ if retry_old in text:
     text = text.replace(retry_old, retry_new, 1)
 
 server.write_text(text)
-print("patch-claw-progress-done-guard: 完成后禁用 progress + 串行化 + 思考中")
+print("patch-claw-progress-done-guard: 完成后禁用 progress + 串行化卡片更新")
 PY
 
 chmod +x "${BASH_SOURCE[0]}"

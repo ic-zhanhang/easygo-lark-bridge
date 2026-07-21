@@ -22,7 +22,7 @@ alwaysApply: true
 
 | 做 | 不做 |
 |----|------|
-| 飞书私聊 / 群 @ 下达改代码、查 git、查 CI | 编包、Gazebo 仿真、dev 容器长编译（交给 Linux 秧秧） |
+| 飞书群话题 @ 下达改代码、查 git、查 CI | 编包、Gazebo 仿真、dev 容器长编译（交给 Linux 秧秧） |
 | 操作 `runtime/` 内 `easygo/`、`frontend/` | 扫或改 workspace 外其他项目 |
 | 心跳：`sync-dev-repos.sh` 拉取本机仓库，列出 commit / 异常 | 无变化时不打扰（静默 `HEARTBEAT_OK`） |
 | Mac 改完 **git push**，供秧秧在 Linux 拉分支继续 | 代替秧秧跑重任务 |

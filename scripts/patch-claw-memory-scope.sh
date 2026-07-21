@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 记忆索引仅覆盖 topics/、文档/；排除 easygo/frontend/MEMORY.md；禁用蒸馏写入长期记忆
+# 记忆索引仅覆盖 文档/；排除 easygo/frontend/MEMORY.md；禁用蒸馏写入长期记忆
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,7 +30,7 @@ if marker not in mem:
     if not m:
         print("patch-claw-memory-scope: 无法定位 SKIP_DIRS", file=sys.stderr)
         sys.exit(1)
-    new_skip = '\tprivate static readonly SKIP_DIRS = new Set([".git", ".cursor", "node_modules", "sessions", "inbox", "relay-bot", "vector-index", "dist", "build", "__pycache__", "easygo", "frontend", "target"]); // CLAW_MEMORY_SCOPE\n\tprivate static readonly INDEX_PREFIXES = ["topics", "文档"]; // CLAW_MEMORY_SCOPE'
+    new_skip = '\tprivate static readonly SKIP_DIRS = new Set([".git", ".cursor", "node_modules", "sessions", "inbox", "relay-bot", "vector-index", "dist", "build", "__pycache__", "easygo", "frontend", "target"]); // CLAW_MEMORY_SCOPE\n\tprivate static readonly INDEX_PREFIXES = ["文档"]; // CLAW_MEMORY_SCOPE'
     mem = mem[: m.start()] + new_skip + mem[m.end() :]
 
     old_walk = """\t\twalk(root);
@@ -70,7 +70,7 @@ if marker not in mem:
     mem = mem.replace(old_recent, new_recent, 1)
 
     memory_path.write_text(mem)
-    print("patch-claw-memory-scope: memory.ts 索引范围已限定为 topics/、文档/")
+    print("patch-claw-memory-scope: memory.ts 索引范围已限定为 文档/")
 else:
     print("patch-claw-memory-scope: memory.ts 已应用，跳过")
 

@@ -112,9 +112,43 @@ if not already_tuned:
 # 兼容 topic-agent / no-resume 等后续 patch 的 usage 传播 fix-up
 replacements = [
     (
+        """\t\t\t\tconst { result, sessionId } = await execAgent(lockKey, workspace, primaryModel, prompt, {
+\t\t\t\t\tsessionId: existingSessionId,
+\t\t\t\t\t...execOpts,
+\t\t\t\t});
+\t\t\t\tif (sessionId && topicKeyForSession) {
+\t\t\t\t\ttopicSessionRepo.set(topicKeyForSession, sessionId);
+\t\t\t\t} else if (sessionId && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\tif (isNewSession) {
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\treturn { result, sessionRenewed };""",
+        """\t\t\t\tconst { result, sessionId, usage } = await execAgent(lockKey, workspace, primaryModel, prompt, {
+\t\t\t\t\tsessionId: existingSessionId,
+\t\t\t\t\t...execOpts,
+\t\t\t\t});
+\t\t\t\tif (sessionId && topicKeyForSession) {
+\t\t\t\t\ttopicSessionRepo.set(topicKeyForSession, sessionId);
+\t\t\t\t} else if (sessionId && CLAW_RESUME_SESSIONS) {
+\t\t\t\t\tsetActiveSession(workspace, sessionId);
+\t\t\t\t\tif (isNewSession) {
+\t\t\t\t\t\tgenerateSessionTitle(workspace, sessionId, prompt, result);
+\t\t\t\t\t}
+\t\t\t\t}
+\t\t\t\treturn { result, usage, sessionRenewed };""",
+        "runAgent 主路径 usage(topic session)",
+    ),
+    (
         "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });",
         "\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });",
         "handle usage 解构(topicKey)",
+    ),
+    (
+        "\t\tconst { result, quotaWarning, sessionRenewed } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });",
+        "\t\tconst { result, quotaWarning, usage, sessionRenewed } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });",
+        "handle usage 解构(topicKey+sessionRenewed)",
     ),
     (
         "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart });",

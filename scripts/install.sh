@@ -396,6 +396,7 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-heartbeat-p2p-authorizer.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-topic-agent.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-group-topic-gate-fix.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-topic-session.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-types-after-gate.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-reply-card-retry.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-card-delivery-fix.sh"
@@ -404,7 +405,6 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-permission-gate.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-group-quiet-reply.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-progress-done-guard.sh"
-  bash "${PACK_ROOT}/scripts/patch-claw-group-topic-context-progress.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-env-unify.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-permission-grant.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-agent-lifecycle.sh"

@@ -1,0 +1,11 @@
+{
+  "name": "easygo-lark-bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test ./tests"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

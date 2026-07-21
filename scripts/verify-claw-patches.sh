@@ -33,6 +33,7 @@ PATCHES=(
   patch-claw-heartbeat-p2p-authorizer.sh
   patch-claw-topic-agent.sh
   patch-claw-group-topic-gate-fix.sh
+  patch-claw-topic-session.sh
   patch-claw-types-after-gate.sh
   patch-claw-reply-card-retry.sh
   patch-claw-card-delivery-fix.sh
@@ -41,7 +42,6 @@ PATCHES=(
   patch-claw-permission-gate.sh
   patch-claw-group-quiet-reply.sh
   patch-claw-progress-done-guard.sh
-  patch-claw-group-topic-context-progress.sh
   patch-claw-env-unify.sh
   patch-claw-permission-grant.sh
   patch-claw-agent-lifecycle.sh
@@ -50,6 +50,13 @@ PATCHES=(
   patch-claw-memory-scope.sh
   patch-claw-runtime-tuning.sh
   patch-claw-agent-startup-grace.sh
+)
+
+# 与 install.sh 一致：部分 patch 允许软失败（上游片段漂移）
+SOFT_FAIL=(
+  patch-claw-permission-gate.sh
+  patch-claw-permission-grant.sh
+  patch-claw-env-unify.sh
 )
 
 failed=0
@@ -62,8 +69,16 @@ for p in "${PATCHES[@]}"; do
   fi
   echo "  · ${p}"
   if ! bash "${script}"; then
-    echo "  ✗ ${p} 失败" >&2
-    failed=1
+    soft=0
+    for s in "${SOFT_FAIL[@]}"; do
+      if [[ "$p" == "$s" ]]; then soft=1; break; fi
+    done
+    if [[ "$soft" -eq 1 ]]; then
+      echo "  ⚠ ${p} 失败（软失败，与 install 一致）" >&2
+    else
+      echo "  ✗ ${p} 失败" >&2
+      failed=1
+    fi
   fi
 done
 

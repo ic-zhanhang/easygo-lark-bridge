@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 话题 Agent：thread 分锁、本机 jsonl 存储、3 话题并行、Linux 仿真主机互斥、图片路径入库
+# 话题 Agent：thread 分锁、3 话题并行、Linux 仿真主机互斥（Relay：无 jsonl）
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -37,19 +37,6 @@ text = text.replace(
     1,
 )
 
-# ── init cleanup after ensureWorkspace ──
-anchor = "ensureWorkspace(defaultWorkspace);"
-if anchor not in text:
-    print("patch-claw-topic-agent: 无法定位 ensureWorkspace", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(
-    anchor,
-    anchor + """
-TopicAgent.cleanupOldTopicFiles(defaultWorkspace);
-setInterval(() => TopicAgent.cleanupOldTopicFiles(defaultWorkspace), 6 * 60 * 60 * 1000);""",
-    1,
-)
-
 # ── runAgent: topicKey + parallel slot ──
 run_old = """async function runAgent(
 \tworkspace: string,
@@ -83,9 +70,45 @@ run_new = """async function runAgent(
 \t}"""
 
 if run_old not in text:
-    print("patch-claw-topic-agent: 无法定位 runAgent 头", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(run_old, run_new, 1)
+    # tolerate startupGraceMs / usage already present from other patches order
+    run_old_alt = """async function runAgent(
+\tworkspace: string,
+\tprompt: string,
+\topts?: {
+\t\tonProgress?: (p: AgentProgress) => void;
+\t\tonStart?: () => void;
+\t\tmaxMs?: number;
+\t\tidleMs?: number;
+\t\tstartupGraceMs?: number;
+\t},
+): Promise<{ result: string; quotaWarning?: string; usage?: { inputTokens?: number; outputTokens?: number } }> {
+\tconst primaryModel = config.CURSOR_MODEL;
+\tconst lockKey = getLockKey(workspace);"""
+    run_new_alt = """async function runAgent(
+\tworkspace: string,
+\tprompt: string,
+\topts?: {
+\t\tonProgress?: (p: AgentProgress) => void;
+\t\tonStart?: () => void;
+\t\tmaxMs?: number;
+\t\tidleMs?: number;
+\t\tstartupGraceMs?: number;
+\t\ttopicKey?: string;
+\t},
+): Promise<{ result: string; quotaWarning?: string; usage?: { inputTokens?: number; outputTokens?: number } }> {
+\tconst primaryModel = config.CURSOR_MODEL;
+\tconst lockKey = TopicAgent.topicLockKey(opts?.topicKey, getLockKey(workspace));
+\tlet releaseTopicSlot: (() => void) | undefined;
+\tif (opts?.topicKey) {
+\t\treleaseTopicSlot = await TopicAgent.acquireTopicParallelSlot(opts.topicKey);
+\t}"""
+    if run_old_alt in text:
+        text = text.replace(run_old_alt, run_new_alt, 1)
+    else:
+        print("patch-claw-topic-agent: 无法定位 runAgent 头", file=sys.stderr)
+        sys.exit(1)
+else:
+    text = text.replace(run_old, run_new, 1)
 
 wrap_old = "\treturn withSessionLock(lockKey, async () => {"
 wrap_new = "\ttry {\n\treturn await withSessionLock(lockKey, async () => {"
@@ -124,81 +147,18 @@ handle_params_new = """async function handle(params: {
 \tsenderOpenId?: string;
 \tthreadId?: string;
 \ttopicKey?: string;
+\tmentions?: FeishuMention[];
 }) {
-\tconst { messageId, chatId, chatType, messageType, content, senderOpenId, threadId, topicKey } = params;
+\tconst { messageId, chatId, chatType, messageType, content, senderOpenId, threadId, topicKey, mentions } = params;
 \tlet { text } = params;"""
 
 if handle_params_old not in text:
-    print("patch-claw-topic-agent: 无法定位 handle params", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(handle_params_old, handle_params_new, 1)
+    print("patch-claw-topic-agent: 无法定位 handle params（可能已被 group-mention 改过）", file=sys.stderr)
+    # continue — group-mention may already expand handle
+else:
+    text = text.replace(handle_params_old, handle_params_new, 1)
 
-handle_call_old = "\treturn handleInner(text, messageId, chatId, chatType, messageType, content, senderOpenId);"
-handle_call_new = "\treturn handleInner(text, messageId, chatId, chatType, messageType, content, senderOpenId, threadId, topicKey);"
-text = text.replace(handle_call_old, handle_call_new, 1)
-
-handle_inner_sig_old = """async function handleInner(
-\ttext: string,
-\tmessageId: string,
-\tchatId: string,
-\tchatType: string,
-\tmessageType: string,
-\tcontent: string,
-\tsenderOpenId?: string,
-): Promise<void> {"""
-
-handle_inner_sig_new = """async function handleInner(
-\ttext: string,
-\tmessageId: string,
-\tchatId: string,
-\tchatType: string,
-\tmessageType: string,
-\tcontent: string,
-\tsenderOpenId?: string,
-\tthreadId?: string,
-\ttopicKey?: string,
-): Promise<void> {"""
-
-if handle_inner_sig_old not in text:
-    print("patch-claw-topic-agent: 无法定位 handleInner", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(handle_inner_sig_old, handle_inner_sig_new, 1)
-
-# ── after media download block, append topic user message ──
-media_end = """\t} catch (e) {
-\t\tconsole.error("[下载失败]", e);
-\t\tif (!text) {
-\t\t\tif (cardId) await updateCard(cardId, "❌ 媒体下载失败，请重新发送", { color: "red" });
-\t\t\telse await replyCard(messageId, "❌ 媒体下载失败，请重新发送");
-\t\t\treturn;
-\t\t}
-\t}"""
-
-media_end_new = media_end + """
-
-\t// CLAW_TOPIC_AGENT: 本机记录用户 @（含图片路径）
-\tif (topicKey) {
-\t\ttry {
-\t\t\tTopicAgent.appendTopicMessage(defaultWorkspace, topicKey, {
-\t\t\t\tts: new Date().toISOString(),
-\t\t\t\tmessage_id: messageId,
-\t\t\t\trole: "user",
-\t\t\t\tsender_open_id: senderOpenId,
-\t\t\t\ttext: text.slice(0, 8000),
-\t\t\t\timage_path: TopicAgent.extractImagePathFromText(text),
-\t\t\t\tmessage_type: messageType,
-\t\t\t});
-\t\t} catch (e) {
-\t\t\tconsole.warn("[话题] 写入用户消息失败:", e);
-\t\t}
-\t}"""
-
-if media_end not in text:
-    print("patch-claw-topic-agent: 无法定位媒体下载块", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(media_end, media_end_new, 1)
-
-# ── queue key + sim mutex + topic history before runAgent ──
+# ── queue key + sim mutex (no history) ──
 queue_old = """\tconst currentLockKey = getLockKey(workspace);
 \tconst needsSessionQueue = !cardId && busySessions.has(currentLockKey);"""
 
@@ -210,11 +170,6 @@ queue_new = """\tconst currentLockKey = TopicAgent.topicLockKey(topicKey, getLoc
 \t\t\tawait replyCard(messageId, TopicAgent.simHostBusyMessage(), { title: "仿真占用中", color: "orange" });
 \t\t\treturn;
 \t\t}
-\t}
-
-\t// CLAW_TOPIC_DEFAULT_CONTEXT: 群话题默认附上下文；私聊仍按需
-\tif (topicKey && TopicAgent.shouldAttachTopicHistory(chatType, prompt)) {
-\t\tprompt += TopicAgent.topicHistoryPromptSuffix(defaultWorkspace, topicKey);
 \t}"""
 
 if queue_old not in text:
@@ -224,37 +179,15 @@ text = text.replace(queue_old, queue_new, 1)
 
 run_call_old = "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart });"
 run_call_new = "\t\tconst { result, quotaWarning } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });"
-text = text.replace(run_call_old, run_call_new, 1)
+if run_call_old in text:
+    text = text.replace(run_call_old, run_call_new, 1)
+else:
+    run_call_old2 = "\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart });"
+    run_call_new2 = "\t\tconst { result, quotaWarning, usage } = await runAgent(workspace, prompt, { onProgress, onStart, topicKey });"
+    if run_call_old2 in text:
+        text = text.replace(run_call_old2, run_call_new2, 1)
 
-# ── append assistant to topic after success ──
-assist_old = """\t\tconsole.log(`[${new Date().toISOString()}] 完成 [${label}] model=${usedModel} elapsed=${elapsed} (${result.length} chars)`);
-
-\t\t// 记录 assistant 回复到会话日志
-\t\tif (memory) {"""
-
-assist_new = """\t\tconsole.log(`[${new Date().toISOString()}] 完成 [${label}] model=${usedModel} elapsed=${elapsed} (${result.length} chars)`);
-
-\t\tif (topicKey) {
-\t\t\ttry {
-\t\t\t\tTopicAgent.appendTopicMessage(defaultWorkspace, topicKey, {
-\t\t\t\t\tts: new Date().toISOString(),
-\t\t\t\t\trole: "assistant",
-\t\t\t\t\ttext: result.slice(0, 8000),
-\t\t\t\t});
-\t\t\t} catch (e) {
-\t\t\t\tconsole.warn("[话题] 写入 Bot 回复失败:", e);
-\t\t\t}
-\t\t}
-
-\t\t// 记录 assistant 回复到会话日志
-\t\tif (memory) {"""
-
-if assist_old not in text:
-    print("patch-claw-topic-agent: 无法定位 assistant 日志", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(assist_old, assist_new, 1)
-
-# ── dispatcher: thread_id + group gate ──
+# ── dispatcher: thread_id ──
 disp_old = """\t\t\tconst mentions = (msg.mentions as FeishuMention[] | undefined) ?? [];
 
 \t\t\tif (isDup(messageId)) return;"""
@@ -264,18 +197,14 @@ disp_new = """\t\t\tconst mentions = (msg.mentions as FeishuMention[] | undefine
 
 \t\t\tif (isDup(messageId)) return;"""
 
-if disp_old not in text:
-    print("patch-claw-topic-agent: 无法定位 dispatcher", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(disp_old, disp_new, 1)
+if disp_old in text and "msg.thread_id" not in text.split("if (isDup(messageId)) return;")[0][-200:]:
+    text = text.replace(disp_old, disp_new, 1)
 
 handle_invoke_old = """\t\t\t\tparsedText = stripMentionPlaceholders(parsedText, mentions);
 \t\t\t}
 
 \t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);
 \t\t\thandle({ text: parsedText.trim(), messageId, chatId, chatType, messageType, content, senderOpenId }).catch(console.error);"""
-
-# topic-agent patch 在 group-mention 之后运行，gate 由 patch-claw-group-topic-gate-fix 注入
 
 handle_invoke_new = """\t\t\t\tparsedText = stripMentionPlaceholders(parsedText, mentions);
 \t\t\t}
@@ -284,17 +213,11 @@ handle_invoke_new = """\t\t\t\tparsedText = stripMentionPlaceholders(parsedText,
 \t\t\tconsole.log(`[解析] type=${messageType} chat=${chatType} thread=${threadId?.slice(0, 12) ?? "-"} sender=${senderOpenId.slice(0, 12)} text="${parsedText.slice(0, 60)}" img=${imageKey ?? ""} file=${fileKey ?? ""}`);
 \t\t\thandle({ text: parsedText.trim(), messageId, chatId, chatType, messageType, content, senderOpenId, threadId, topicKey }).catch(console.error);"""
 
-if handle_invoke_old not in text:
-    print("patch-claw-topic-agent: 无法定位 handle 调用", file=sys.stderr)
-    sys.exit(1)
-text = text.replace(handle_invoke_old, handle_invoke_new, 1)
-
-# pure image: allow empty text if imageKey
-# parseContent for image type returns empty text - dispatcher still needs to pass imageKey
-# handleInner re-parses content - OK for image messageType
+if handle_invoke_old in text:
+    text = text.replace(handle_invoke_old, handle_invoke_new, 1)
 
 server.write_text(text)
-print("patch-claw-topic-agent: 已应用话题 Agent（存储/并行/仿真锁/图片路径）")
+print("patch-claw-topic-agent: 已应用话题并行/仿真锁（无 jsonl）")
 PY
 
 chmod +x "${BASH_SOURCE[0]}"

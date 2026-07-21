@@ -9,7 +9,8 @@ alwaysApply: false
 
 - **每条飞书消息是新任务**，不要自动 search、不要读 `.cursor/MEMORY.md`（已停用）。
 - 用户**点名文件/路径** → 只 Read 该路径。
-- 用户说「读历史 / 结合之前 / 读话题记录」→ Read `topics/` 下对应 jsonl。
+- **群聊话题**：桥接会默认附上话题 jsonl 路径 → 请 Read 该文件。
+- 私聊或用户说「读历史 / 结合之前 / 读话题记录」→ Read `topics/` 下对应 jsonl。
 
 ## 可选：memory-tool（仅用户要查历史或团队文档时）
 

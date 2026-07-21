@@ -58,12 +58,18 @@ export function shouldLoadTopicHistory(prompt: string): boolean {
 	return /读.*话题|话题.*所有|所有消息|读完.*话题|看看.*话题|回顾.*话题|结合.*话题.*消息/i.test(prompt);
 }
 
+/** 群话题默认带上下文；私聊仍需明确要求才附话题文件 */
+export function shouldAttachTopicHistory(chatType: string, prompt: string): boolean {
+	if (chatType === "group") return true;
+	return shouldLoadTopicHistory(prompt);
+}
+
 export function topicHistoryPromptSuffix(workspace: string, topicKey: string): string {
 	const path = getTopicFilePath(workspace, topicKey);
 	if (!existsSync(path)) {
 		return "\n\n[话题记录] 本地尚无历史文件。";
 	}
-	return `\n\n[话题记录文件] ${path}\n用户要求结合话题内历史；请读取该文件（含用户 @ 与 Bot 回复、图片本地路径）。`;
+	return `\n\n[话题记录文件] ${path}\n请读取该文件作为本话题上下文（含用户 @ 与 Bot 回复、图片本地路径）。`;
 }
 
 const activeTopicSlots = new Set<string>();

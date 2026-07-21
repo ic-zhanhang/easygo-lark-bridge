@@ -87,6 +87,24 @@ cmd_restart() {
   systemctl --user restart "${UNIT_NAME}" && echo "  已重启"
 }
 
+# Agent 改完桥接后请用这个，勿在任务中途直接 restart（会 SIGTERM 杀掉自己）
+cmd_restart_defer() {
+  local sec="${1:-20}"
+  if ! [[ "${sec}" =~ ^[0-9]+$ ]] || [[ "${sec}" -lt 3 ]]; then
+    echo "用法: bash $0 restart-defer [秒数≥3]" >&2
+    exit 1
+  fi
+  # 脱离服务 cgroup，定时器存活于 user manager，不受本次 stop 影响
+  if command -v systemd-run >/dev/null 2>&1; then
+    systemd-run --user --on-active="${sec}s" --timer-property=AccuracySec=1s \
+      /bin/systemctl --user restart "${UNIT_NAME}" >/dev/null
+  else
+    nohup bash -c "sleep ${sec}; systemctl --user restart '${UNIT_NAME}'" >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+  fi
+  echo "  已安排 ${sec}s 后重启 ${UNIT_NAME}（当前任务可先跑完）"
+}
+
 cmd_status() {
   echo "秧秧 Claw (${UNIT_NAME})"
   echo "  仓库: ${PACK_ROOT}"
@@ -104,10 +122,11 @@ case "${1:-}" in
   start)     cmd_start ;;
   stop)      cmd_stop ;;
   restart)   cmd_restart ;;
+  restart-defer) cmd_restart_defer "${2:-20}" ;;
   status)    cmd_status ;;
   logs)      cmd_logs ;;
   *)
-    echo "用法: bash ${PACK_ROOT}/scripts/claw-service-linux.sh <install|status|logs|...>"
+    echo "用法: bash ${PACK_ROOT}/scripts/claw-service-linux.sh <install|status|logs|restart|restart-defer|...>"
     echo "日志: ${LOG_FILE}"
     ;;
 esac

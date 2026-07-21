@@ -404,9 +404,11 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-permission-gate.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-group-quiet-reply.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-progress-done-guard.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-group-topic-context-progress.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-env-unify.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-permission-grant.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-agent-lifecycle.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-shutdown-no-fail.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-memory-fts-only.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-memory-scope.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-runtime-tuning.sh"

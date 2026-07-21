@@ -212,7 +212,8 @@ queue_new = """\tconst currentLockKey = TopicAgent.topicLockKey(topicKey, getLoc
 \t\t}
 \t}
 
-\tif (topicKey && TopicAgent.shouldLoadTopicHistory(prompt)) {
+\t// CLAW_TOPIC_DEFAULT_CONTEXT: 群话题默认附上下文；私聊仍按需
+\tif (topicKey && TopicAgent.shouldAttachTopicHistory(chatType, prompt)) {
 \t\tprompt += TopicAgent.topicHistoryPromptSuffix(defaultWorkspace, topicKey);
 \t}"""
 

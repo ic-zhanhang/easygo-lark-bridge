@@ -41,9 +41,11 @@ PATCHES=(
   patch-claw-permission-gate.sh
   patch-claw-group-quiet-reply.sh
   patch-claw-progress-done-guard.sh
+  patch-claw-group-topic-context-progress.sh
   patch-claw-env-unify.sh
   patch-claw-permission-grant.sh
   patch-claw-agent-lifecycle.sh
+  patch-claw-shutdown-no-fail.sh
   patch-claw-memory-fts-only.sh
   patch-claw-memory-scope.sh
   patch-claw-runtime-tuning.sh

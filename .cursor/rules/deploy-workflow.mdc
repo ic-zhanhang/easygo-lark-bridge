@@ -19,6 +19,13 @@ bash scripts/claw-service.sh restart
 bash scripts/claw-service.sh status
 ```
 
+**Agent 在本机改桥接时**：不要在任务中途 `restart`（会 SIGTERM 杀掉自己，卡片报「执行失败」）。应先跑完 `install.sh`，回复用户后用：
+
+```bash
+bash scripts/claw-service.sh restart-defer 20          # Mac
+bash scripts/claw-service-linux.sh restart-defer 20    # Linux
+```
+
 `config/easygo.env`、`claw/`、`runtime/` **不入库**；各机器各自维护。
 
 ### 2. 提交并推送到云端

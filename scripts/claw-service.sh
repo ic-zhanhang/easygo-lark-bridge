@@ -84,6 +84,18 @@ cmd_stop() {
 
 cmd_restart() { cmd_stop; sleep 2; cmd_start; }
 
+# Agent 改完桥接后请用这个，勿在任务中途直接 restart（会 SIGTERM 杀掉自己）
+cmd_restart_defer() {
+  local sec="${1:-20}"
+  if ! [[ "${sec}" =~ ^[0-9]+$ ]] || [[ "${sec}" -lt 3 ]]; then
+    echo "用法: bash $0 restart-defer [秒数≥3]" >&2
+    exit 1
+  fi
+  nohup bash -c "sleep ${sec}; launchctl kill SIGTERM \"gui/\$(id -u)/${LABEL}\" 2>/dev/null; sleep 2; launchctl kickstart -k \"gui/\$(id -u)/${LABEL}\" 2>/dev/null" >/dev/null 2>&1 &
+  disown 2>/dev/null || true
+  echo "  已安排 ${sec}s 后重启 ${LABEL}（当前任务可先跑完）"
+}
+
 cmd_status() {
   echo "EasyGo Claw (${LABEL})"
   echo "  仓库: ${PACK_ROOT}"
@@ -105,10 +117,11 @@ case "${1:-}" in
   start)     cmd_start ;;
   stop)      cmd_stop ;;
   restart)   cmd_restart ;;
+  restart-defer) cmd_restart_defer "${2:-20}" ;;
   status)    cmd_status ;;
   logs)      cmd_logs ;;
   *)
-    echo "用法: bash ${PACK_ROOT}/scripts/claw-service.sh <install|status|logs|...>"
+    echo "用法: bash ${PACK_ROOT}/scripts/claw-service.sh <install|status|logs|restart|restart-defer|...>"
     echo "日志: ${LOG_FILE}"
     ;;
 esac

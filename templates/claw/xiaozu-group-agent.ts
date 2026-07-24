@@ -290,6 +290,19 @@ export function formatDecisionCandidateCard(candidate: DecisionCandidate): strin
 	].filter(Boolean).join("\n");
 }
 
+/** 去 @ 后几乎无正文：光 @ Bot / 仅占位符 */
+export function isBareMentionText(text: string): boolean {
+	const normalized = text
+		.replace(/<at\b[^>]*>.*?<\/at>/gis, "")
+		.replace(/@_user_\d+/gi, "")
+		.replace(/@\S+/g, "")
+		.trim();
+	if (!normalized) return true;
+	// server 曾用 [text]/[image] 占位；也视为无实质正文
+	if (/^\[[a-z0-9_\-]+\]$/i.test(normalized)) return true;
+	return normalized.length <= 1;
+}
+
 export function isPrincipleVoteText(text: string): "confirm" | "reject" | null {
 	const normalized = text
 		.replace(/<at\b[^>]*>.*?<\/at>/gis, "")
@@ -513,6 +526,7 @@ function modelSystemPrompt(personaName: string): string {
 		"confirm_cursor / cancel_cursor 时 message 可短回一句；confirm 时 cursor_intent 可留空（沿用 pending）。",
 		"发现值得长期记住的短决定时用 propose_decision；不要把闲聊写成决定。",
 		"寒暄、附和、没增量时 silence。message 像群友，短，不提模型/路由/Cursor/Qwen。",
+		"若用户只 @ 你、几乎没有正文：不要 silence；结合最近群消息简短接话，或 ask_cursor 问要不要你去查/记。",
 	].join("\n");
 }
 
@@ -632,6 +646,17 @@ export function createXiaozuGroupAgent(options: {
 		) {
 			action = "silence";
 			reason = "cooldown";
+		}
+		// 用户只 @ 了 Bot：禁止闷声；至少短回，或让模型结合近窗上下文说话
+		if (input.mentioned && isBareMentionText(input.text) && action === "silence") {
+			action = "reply";
+			reason = "bare_mention_fallback";
+			output = {
+				...output,
+				message:
+					output.message ||
+					"嗯？我在。是要我看刚才那段，还是另有事？",
+			};
 		}
 
 		// pending_cursor 状态机：ask → confirm/cancel（模式由鉴权代码决定，不在此选）

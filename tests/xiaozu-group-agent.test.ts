@@ -427,6 +427,34 @@ describe("Qwen Speak Gate", () => {
 		expect(loadXiaozuGroupState(ws, "oc_1").pending_cursor).toBeUndefined();
 	});
 
+
+	test("bare @ mention never stays silent", async () => {
+		const agent = createXiaozuGroupAgent({
+			workspace: workspace(),
+			config: config({ cooldownMs: 0 }),
+			model: async () => ({
+				action: "silence",
+				confidence: 0.9,
+				reason: "nothing",
+				message: "",
+				cursor_intent: "",
+				decision_title: "",
+			}),
+		});
+		const result = await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_bare",
+			text: "@_user_1",
+			messageType: "text",
+			mentioned: true,
+			authorized: true,
+		});
+		expect(result.action).toBe("reply");
+		expect(result.reason).toBe("bare_mention_fallback");
+		expect(result.message.length).toBeGreaterThan(0);
+	});
+
 	test("busy local model drops excess decisions instead of growing an unbounded queue", async () => {
 		let releaseFirst: () => void = () => {};
 		let markStarted: () => void = () => {};

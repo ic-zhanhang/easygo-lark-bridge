@@ -338,3 +338,4 @@ PY
 
 # Cursor Ask/Agent + 结果回灌（幂等）
 python3 "${PACK_ROOT}/scripts/_patch-xiaozu-cursor-mode.py" "${SERVER}"
+python3 "${PACK_ROOT}/scripts/_patch-xiaozu-bare-mention.py" "${SERVER}"

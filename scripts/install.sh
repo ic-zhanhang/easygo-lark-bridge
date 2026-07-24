@@ -398,7 +398,7 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-topic-agent.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-group-topic-gate-fix.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-topic-session.sh"
-  bash "${PACK_ROOT}/scripts/patch-claw-types-after-gate.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-types-after-gate.sh" || true
   bash "${PACK_ROOT}/scripts/patch-claw-reply-card-retry.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-card-delivery-fix.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-mention-id-fix.sh"

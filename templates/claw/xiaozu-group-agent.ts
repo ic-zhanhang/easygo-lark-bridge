@@ -647,15 +647,26 @@ export function createXiaozuGroupAgent(options: {
 			action = "silence";
 			reason = "cooldown";
 		}
-		// 用户只 @ 了 Bot：禁止闷声；至少短回，或让模型结合近窗上下文说话
-		if (input.mentioned && isBareMentionText(input.text) && action === "silence") {
+		// 光 @ = 恢复对话：禁止 silence；结合近窗接一句
+		const bare = Boolean(
+			input.bareMention || (input.mentioned && isBareMentionText(input.text)),
+		);
+		if (bare && (action === "silence" || !cleanText(output.message))) {
 			action = "reply";
-			reason = "bare_mention_fallback";
+			reason = "bare_mention_resume";
+			const recent = entries
+				.filter((e) => e.message_id !== input.messageId)
+				.slice(-3);
+			const last = recent.length ? formatEntry(recent[recent.length - 1]!) : "";
+			const snippet = last
+				? last.replace(/^\[[^\]]*\]\s*[^:]*:\s*/, "").slice(0, 100)
+				: "";
+			const fallback = snippet
+				? `嗯，我在。刚才那条是「${snippet}」——要我接着看，还是另有安排？`
+				: "嗯，我在。要我接着刚才的聊，还是另有事？";
 			output = {
 				...output,
-				message:
-					output.message ||
-					"嗯？我在。是要我看刚才那段，还是另有事？",
+				message: cleanText(output.message) || fallback,
 			};
 		}
 
@@ -985,10 +996,13 @@ export function createXiaozuGroupAgent(options: {
 	async function tick(event: GroupMessageTick): Promise<SpeakDecision | BehaviorDecision> {
 		const vote = handlePrincipleVote(event);
 		if (vote) return vote;
-		// 已有待确认 Cursor 意图时，跳过硬静默，交 Qwen 判断确认/取消/继续聊。
-		// peek 不用业务 now()，避免单测里 now 步进被额外消耗。
+		// 已有待确认 Cursor 意图 / 光 @ 恢复对话：跳过硬静默，直接走社交叶
 		const peeked = loadXiaozuGroupState(options.workspace, event.chatId, new Date(0));
-		if (peeked.pending_cursor) {
+		if (
+			peeked.pending_cursor ||
+			event.bareMention ||
+			(event.mentioned && isBareMentionText(event.text))
+		) {
 			return classifySocial(event);
 		}
 		return behaviorTree.tick(event);

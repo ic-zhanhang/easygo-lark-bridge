@@ -428,6 +428,36 @@ describe("Qwen Speak Gate", () => {
 	});
 
 
+	test("bare @ resumes dialogue using recent group context", async () => {
+		const ws = workspace();
+		appendSpectatorLine(ws, line("oc_1", "om_ctx", "ui地址——http://10.10.21.89:9999/，秘钥xxx"));
+		const agent = createXiaozuGroupAgent({
+			workspace: ws,
+			config: config({ cooldownMs: 0 }),
+			model: async () => ({
+				action: "silence",
+				confidence: 0.99,
+				reason: "not about me",
+				message: "",
+				cursor_intent: "",
+				decision_title: "",
+			}),
+		});
+		const result = await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_bare2",
+			text: "@_user_1",
+			messageType: "text",
+			mentioned: true,
+			authorized: true,
+			bareMention: true,
+		});
+		expect(result.action).toBe("reply");
+		expect(result.reason).toBe("bare_mention_resume");
+		expect(result.message).toContain("10.10.21.89");
+	});
+
 	test("bare @ mention never stays silent", async () => {
 		const agent = createXiaozuGroupAgent({
 			workspace: workspace(),
@@ -449,9 +479,10 @@ describe("Qwen Speak Gate", () => {
 			messageType: "text",
 			mentioned: true,
 			authorized: true,
+			bareMention: true,
 		});
 		expect(result.action).toBe("reply");
-		expect(result.reason).toBe("bare_mention_fallback");
+		expect(result.reason).toBe("bare_mention_resume");
 		expect(result.message.length).toBeGreaterThan(0);
 	});
 

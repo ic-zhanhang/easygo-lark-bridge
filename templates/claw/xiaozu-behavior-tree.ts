@@ -26,6 +26,8 @@ export interface GroupMessageTick {
 	messageType: string;
 	mentioned: boolean;
 	authorized: boolean;
+	/** 去 @ 后无实质正文：应恢复对话，禁止闷声 */
+	bareMention?: boolean;
 }
 
 export interface XiaozuBehaviorDependencies {

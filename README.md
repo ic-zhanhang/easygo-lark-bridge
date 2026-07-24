@@ -40,6 +40,8 @@ bash scripts/claw-service-linux.sh install   # systemd
 
 飞书群**话题**内 @达妮娅 或 @秧秧；同话题续聊（Topic Session）。`/新对话` 或 `/reset` 重置当前话题会话。
 
+特殊白名单「小组」群支持主群共处模式：每条群消息 Tick 一次行为树；未 @ 时由本地 Qwen 叶子决定静默、短回复或提出候选任务，只有 @Bot 且通过代码权限门后才会选择 Cursor 开工。详见 [小组群聊 Agent](./docs/小组群聊Agent.md)。
+
 | Bot | 机器 | 日志 |
 |-----|------|------|
 | 达妮娅 | Mac | `runtime/logs/feishu-cursor.log` |

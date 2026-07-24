@@ -4,6 +4,7 @@ import {
 	parseEasyGoSlash,
 	easyGoHelpText,
 	unknownSlashReply,
+	formatCursorContext,
 	NO_THREAD_REPLY,
 	P2P_INBOUND_REPLY,
 	RESET_REPLY,
@@ -23,6 +24,13 @@ describe("Group Topic Only inbound gate", () => {
 			expect(r.reason).toBe("no_thread");
 			expect(r.reply).toBe(NO_THREAD_REPLY);
 		}
+	});
+
+	test("designated main group gets one stable shared topicKey", () => {
+		const r = gateInboundMessage("group", undefined, {
+			mainGroupTopicKey: "xiaozu:oc_123",
+		});
+		expect(r).toEqual({ action: "allow", topicKey: "xiaozu:oc_123" });
 	});
 
 	test("p2p inbound is rejected", () => {
@@ -48,6 +56,7 @@ describe("EasyGo slash commands", () => {
 		const help = easyGoHelpText();
 		expect(help).toContain("/新对话");
 		expect(help).toContain("/reset");
+		expect(help).toContain("/上下文");
 		expect(help).toContain("/心跳");
 		expect(help).not.toContain("/记忆");
 		expect(help).not.toContain("/会话");
@@ -58,6 +67,16 @@ describe("EasyGo slash commands", () => {
 		expect(parseEasyGoSlash("/reset")).toEqual({ kind: "reset" });
 		expect(parseEasyGoSlash("/new")).toEqual({ kind: "reset" });
 		expect(RESET_REPLY).toContain("Topic Session");
+	});
+
+	test("context aliases", () => {
+		expect(parseEasyGoSlash("/上下文")).toEqual({ kind: "context" });
+		expect(parseEasyGoSlash("/context")).toEqual({ kind: "context" });
+		expect(parseEasyGoSlash("/上下文 @达妮娅")).toEqual({ kind: "context" });
+		const body = formatCursorContext({ topicKey: "xiaozu:oc_1", sessionId: "sess-1" });
+		expect(body).toContain("xiaozu:oc_1");
+		expect(body).toContain("sess-1");
+		expect(formatCursorContext({})).toContain("下次 @");
 	});
 
 	test("heartbeat passthrough", () => {

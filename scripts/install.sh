@@ -267,7 +267,8 @@ setup_runtime_dirs() {
   mkdir -p "${RUNTIME_DIR}/inbox" \
            "${RUNTIME_DIR}/logs" \
            "${RUNTIME_DIR}/state" \
-           "${RUNTIME_DIR}/.cursor/sessions"
+           "${RUNTIME_DIR}/.cursor/sessions" \
+           "${RUNTIME_DIR}/文档/小组旁观"
 
   ln -sfn "${RUNTIME_DIR}/inbox" "${inbox_link}"
   echo "  ${inbox_link} → runtime/inbox"
@@ -413,6 +414,8 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-memory-scope.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-runtime-tuning.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-agent-startup-grace.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-xiaozu-spectator.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-xiaozu-group-agent.sh"
   finalize_claw_install
   setup_claw_config
   print_next_steps

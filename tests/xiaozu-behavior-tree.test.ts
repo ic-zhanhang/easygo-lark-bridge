@@ -18,24 +18,26 @@ function message(overrides: Partial<GroupMessageTick> = {}): GroupMessageTick {
 }
 
 describe("Xiaozu behavior tree", () => {
-	test("an authorized mention selects work before social classification", async () => {
+	test("an authorized mention goes to social classification, not work", async () => {
 		let socialCalls = 0;
 		const tree = createXiaozuBehaviorTree({
 			classifySocial: async () => {
 				socialCalls++;
-				return { action: "reply", confidence: 1, reason: "social", message: "不该调用" };
+				return {
+					action: "reply",
+					confidence: 0.95,
+					reason: "social_reply",
+					message: "好，我先看下你说的点。",
+				};
 			},
 		});
 
 		const result = await tree.tick(message());
 
-		expect(result).toEqual({
-			action: "work",
-			confidence: 1,
-			reason: "mentioned_authorized",
-			message: "",
-		});
-		expect(socialCalls).toBe(0);
+		expect(result.action).toBe("reply");
+		expect(result.message).toBe("好，我先看下你说的点。");
+		expect(result.action).not.toBe("work");
+		expect(socialCalls).toBe(1);
 	});
 
 	test("a substantive unauthorized mention goes to social classification without work", async () => {
@@ -101,7 +103,7 @@ describe("Xiaozu behavior tree", () => {
 			classifySocial: async () => {
 				socialCalls++;
 				return {
-					action: "propose_task",
+					action: "ask_cursor",
 					confidence: 0.91,
 					reason: "clear_task",
 					message: "需要我整理的话 @我。",
@@ -116,7 +118,7 @@ describe("Xiaozu behavior tree", () => {
 			text: "谁整理一下今天的回归结果？",
 		}));
 
-		expect(result.action).toBe("propose_task");
+		expect(result.action).toBe("ask_cursor");
 		expect(result.task).toEqual({ id: "candidate-1" });
 		expect(socialCalls).toBe(1);
 	});

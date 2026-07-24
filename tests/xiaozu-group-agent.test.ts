@@ -5,6 +5,7 @@ import { resolve } from "path";
 import {
 	createXiaozuGroupAgent,
 	loadXiaozuGroupState,
+	saveXiaozuGroupState,
 	type XiaozuGroupAgentConfig,
 } from "../templates/claw/xiaozu-group-agent.ts";
 import {
@@ -55,14 +56,21 @@ function line(
 }
 
 describe("Qwen Speak Gate", () => {
-	test("an authorized mention ticks to work without calling Qwen", async () => {
+	test("an authorized mention talks via Qwen instead of jumping to work", async () => {
 		let calls = 0;
 		const agent = createXiaozuGroupAgent({
 			workspace: workspace(),
 			config: config(),
 			model: async () => {
 				calls++;
-				return {};
+				return {
+					action: "reply",
+					confidence: 0.93,
+					reason: "social_reply",
+					message: "可以，我先帮你对一下范围。",
+					cursor_intent: "",
+					decision_title: "",
+				};
 			},
 		});
 
@@ -76,8 +84,97 @@ describe("Qwen Speak Gate", () => {
 			authorized: true,
 		});
 
-		expect(result.action).toBe("work");
-		expect(calls).toBe(0);
+		expect(result.action).toBe("reply");
+		expect(result.message).toContain("范围");
+		expect(calls).toBe(1);
+	});
+
+	test("ask_cursor then confirm_cursor escalates; mode forced by auth code", async () => {
+		const ws = workspace();
+		let step = 0;
+		const agent = createXiaozuGroupAgent({
+			workspace: ws,
+			config: config({ cooldownMs: 0 }),
+			model: async () => {
+				step++;
+				if (step === 1) {
+					return {
+						action: "ask_cursor",
+						confidence: 0.95,
+						reason: "need_tool",
+						message: "要我去看下接口回归吗？",
+						cursor_intent: "检查接口回归",
+						decision_title: "",
+					};
+				}
+				return {
+					action: "confirm_cursor",
+					confidence: 0.96,
+					reason: "user_confirmed",
+					message: "好，我去看看。",
+					cursor_intent: "",
+					decision_title: "",
+				};
+			},
+		});
+
+		const ask = await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_ask",
+			text: "接口回归挂了",
+			messageType: "text",
+			mentioned: true,
+			authorized: false,
+		});
+		expect(ask.action).toBe("ask_cursor");
+		expect(loadXiaozuGroupState(ws, "oc_1").pending_cursor?.intent).toBe("检查接口回归");
+
+		const denied = await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_yes_noauth",
+			text: "去吧",
+			messageType: "text",
+			mentioned: true,
+			authorized: false,
+		});
+		expect(denied.action).toBe("work");
+		expect(denied.cursorMode).toBe("ask");
+		expect(denied.cursorIntent).toBe("检查接口回归");
+		agent.completeTaskTurn(
+			agent.buildTaskTurn({
+				chatId: "oc_1",
+				messageId: "om_yes_noauth",
+				request: "去吧",
+				cursorMode: "ask",
+				cursorIntent: denied.cursorIntent,
+			}),
+			"只读结论",
+		);
+
+		// re-ask then confirm with auth → agent
+		step = 0;
+		await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_ask2",
+			text: "还得改一下",
+			messageType: "text",
+			mentioned: true,
+			authorized: true,
+		});
+		const allowed = await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_yes_auth",
+			text: "去吧",
+			messageType: "text",
+			mentioned: true,
+			authorized: true,
+		});
+		expect(allowed.action).toBe("work");
+		expect(allowed.cursorMode).toBe("agent");
 	});
 
 	test("an unauthorized mention is sent to Qwen as social-only input", async () => {
@@ -97,7 +194,7 @@ describe("Qwen Speak Gate", () => {
 					common_ground: "",
 					decisions: [],
 					open_questions: [],
-					task_title: "",
+					cursor_intent: "",
 				};
 			},
 		});
@@ -116,7 +213,7 @@ describe("Qwen Speak Gate", () => {
 		expect(result.action).not.toBe("work");
 		expect(calls).toBe(1);
 		expect(userPrompt).toContain('"mentioned":true');
-		expect(userPrompt).toContain('"execution_allowed":false');
+		expect(userPrompt).toContain('"authorized":false');
 	});
 
 	test("hard silence does not call the model", async () => {
@@ -158,7 +255,7 @@ describe("Qwen Speak Gate", () => {
 				common_ground: "先锁定接口，再并行实现。",
 				decisions: ["今天先定接口"],
 				open_questions: [],
-				task_title: "",
+				cursor_intent: "",
 				decision_title: "",
 			}),
 		});
@@ -184,7 +281,7 @@ describe("Qwen Speak Gate", () => {
 				confidence: 0.95,
 				reason: "杨展航和宋锦涛都强调按使用者拆分",
 				message: "",
-				task_title: "",
+				cursor_intent: "",
 				decision_title: "按使用者拆前端视角",
 			}),
 		});
@@ -230,7 +327,7 @@ describe("Qwen Speak Gate", () => {
 				confidence: 0.95,
 				reason: "可能是闲聊",
 				message: "",
-				task_title: "",
+				cursor_intent: "",
 				decision_title: "今天天气不错也要记",
 			}),
 		});
@@ -259,20 +356,20 @@ describe("Qwen Speak Gate", () => {
 		expect(state.decision_candidates[0]?.status).toBe("rejected");
 	});
 
-	test("task intent only creates a candidate and never executes", async () => {
+	test("ask_cursor only stores pending intent and never executes", async () => {
 		const ws = workspace();
 		const agent = createXiaozuGroupAgent({
 			workspace: ws,
 			config: config(),
 			model: async () => ({
-				action: "propose_task",
+				action: "ask_cursor",
 				confidence: 0.95,
 				reason: "clear work item",
 				message: "这可以整理成一项任务，需要我做的话 @我确认。",
 				common_ground: "需要整理回归结果。",
 				decisions: [],
 				open_questions: [],
-				task_title: "整理今天的回归测试结果",
+				cursor_intent: "整理今天的回归测试结果",
 			}),
 		});
 		const result = await agent.tick({
@@ -284,19 +381,21 @@ describe("Qwen Speak Gate", () => {
 			mentioned: false,
 			authorized: false,
 		});
-		expect(result.action).toBe("propose_task");
-		expect(result.task?.status).toBe("candidate");
-		expect(loadXiaozuGroupState(ws, "oc_1").tasks[0]?.status).toBe("candidate");
+		expect(result.action).toBe("ask_cursor");
+		expect(loadXiaozuGroupState(ws, "oc_1").pending_cursor?.intent).toBe("整理今天的回归测试结果");
 
 		const turn = agent.buildTaskTurn({
 			chatId: "oc_1",
 			messageId: "om_confirm",
 			request: "你来做这个吧",
+			cursorMode: "ask",
+			cursorIntent: "整理今天的回归测试结果",
 		});
-		expect(turn.taskId).toBe(result.task?.id);
-		expect(turn.prompt).toContain("候选任务");
+		expect(turn.cursorMode).toBe("ask");
+		expect(turn.prompt).toContain("Ask");
+		expect(turn.prompt).toContain("整理今天的回归测试结果");
 		agent.completeTaskTurn(turn, "已经整理好回归测试结果");
-		expect(loadXiaozuGroupState(ws, "oc_1").tasks[0]?.status).toBe("done");
+		expect(loadXiaozuGroupState(ws, "oc_1").pending_cursor).toBeUndefined();
 	});
 
 	test("low-confidence task intent stays silent and is not added to the ledger", async () => {
@@ -305,14 +404,14 @@ describe("Qwen Speak Gate", () => {
 			workspace: ws,
 			config: config(),
 			model: async () => ({
-				action: "propose_task",
+				action: "ask_cursor",
 				confidence: 0.4,
 				reason: "unclear",
 				message: "也许可以做。",
 				common_ground: "",
 				decisions: [],
 				open_questions: ["是否真的需要做？"],
-				task_title: "猜测出来的任务",
+				cursor_intent: "猜测出来的任务",
 			}),
 		});
 		const result = await agent.tick({
@@ -325,7 +424,7 @@ describe("Qwen Speak Gate", () => {
 			authorized: false,
 		});
 		expect(result.action).toBe("silence");
-		expect(loadXiaozuGroupState(ws, "oc_1").tasks).toHaveLength(0);
+		expect(loadXiaozuGroupState(ws, "oc_1").pending_cursor).toBeUndefined();
 	});
 
 	test("busy local model drops excess decisions instead of growing an unbounded queue", async () => {
@@ -351,7 +450,7 @@ describe("Qwen Speak Gate", () => {
 					common_ground: "",
 					decisions: [],
 					open_questions: [],
-					task_title: "",
+					cursor_intent: "",
 				};
 			},
 		});
@@ -380,6 +479,7 @@ describe("incremental execution context", () => {
 			chatId: "oc_1",
 			messageId: "om_work",
 			request: "请把接口改成 B",
+			cursorMode: "agent",
 		});
 		expect(first.prompt).toContain("旧讨论：接口叫 A");
 		agent.completeTaskTurn(first, "接口已经改成 B");
@@ -389,10 +489,11 @@ describe("incremental execution context", () => {
 			chatId: "oc_1",
 			messageId: "om_new",
 			request: "顺便补一个测试",
+			cursorMode: "agent",
 		});
 		expect(second.prompt).not.toContain("旧讨论：接口叫 A");
 		expect(second.prompt).toContain("接口已经改成 B");
-		expect(second.prompt).toContain("当前 @ 请求");
+		expect(second.prompt).toContain("当前意图");
 	});
 });
 
@@ -411,12 +512,12 @@ describe("Cursor context inspection", () => {
 				common_ground: "先定接口",
 				decisions: [],
 				open_questions: [],
-				task_title: "",
+				cursor_intent: "",
 			}),
 		});
 		appendSpectatorLine(ws, line("oc_1", "om_a", "讨论接口"));
 		appendSpectatorLine(ws, line("oc_1", "om_b", "先锁 OpenAPI"));
-		const turn = agent.buildTaskTurn({ chatId: "oc_1", messageId: "om_b", request: "按刚才说的改" });
+		const turn = agent.buildTaskTurn({ chatId: "oc_1", messageId: "om_b", request: "按刚才说的改", cursorMode: "ask" });
 		agent.completeTaskTurn(turn, "已改完");
 		appendSpectatorLine(ws, line("oc_1", "om_c", "再补个错误码"));
 		const body = agent.describeCursorContext("oc_1", {

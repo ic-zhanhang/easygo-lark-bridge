@@ -335,3 +335,6 @@ text = text.replace(old_branch, new_branch, 1)
 server.write_text(text)
 print("patch-claw-xiaozu-group-agent: 已升级为每消息一 Tick 的行为树")
 PY
+
+# Cursor Ask/Agent + 结果回灌（幂等）
+python3 "${PACK_ROOT}/scripts/_patch-xiaozu-cursor-mode.py" "${SERVER}"

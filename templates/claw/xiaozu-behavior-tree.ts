@@ -1,6 +1,14 @@
 // CLAW_XIAOZHU_BEHAVIOR_TREE — 每条「小组」群消息 Tick 一次，只选择行为
 
-export type BehaviorAction = "silence" | "reply" | "propose_task" | "propose_decision" | "work";
+export type BehaviorAction =
+	| "silence"
+	| "reply"
+	| "propose_task"
+	| "propose_decision"
+	| "ask_cursor"
+	| "confirm_cursor"
+	| "cancel_cursor"
+	| "work";
 
 export interface BehaviorDecision {
 	action: BehaviorAction;
@@ -94,13 +102,13 @@ export function isHardSilentMessage(text: string): boolean {
 /**
  * Interface: one group-message event in, one selected behavior out.
  * The tree owns no memory or task state; leaf adapters may call external modules.
+ *
+ * Dialogue always goes to Qwen (after hard-silence). Cursor `work` is NOT selected
+ * here — only the group-agent layer may promote an authorized candidate confirmation
+ * to work before calling this tree.
  */
 export function createXiaozuBehaviorTree(dependencies: XiaozuBehaviorDependencies) {
 	const root = prioritySelector([
-		sequence([
-			condition((event) => event.mentioned && event.authorized),
-			action(() => decision("work", "mentioned_authorized")),
-		]),
 		sequence([
 			condition((event) => isHardSilentMessage(event.text)),
 			action(() => decision("silence", "hard_silence")),

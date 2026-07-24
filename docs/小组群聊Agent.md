@@ -6,29 +6,14 @@
 
 ## 核心模型
 
-每收到一条群消息，就是行为树的一次 Tick：
+每收到一条群消息，就是一次 Tick。**达妮娅 = Qwen**（对群说话）；**Cursor = 幕后工具**（不扮演达妮娅）。
 
 ```text
-tick(group_message) -> silence | reply | propose_task | work
-```
-
-树只负责“这次做什么”，不负责保存记忆、管理任务或维护 Cursor
-Session。每次 Tick 最多选中一个行为。
-
-```mermaid
-flowchart TD
-  M["一条小组群消息"] --> LOG["旁路落盘<br/>文本/媒体"]
-  M --> T["BehaviorTree.tick(event)<br/>恰好一次"]
-  T --> P{"Priority Selector"}
-  P --> A["Sequence<br/>被 @ 且代码鉴权通过"]
-  A --> W["work"]
-  P --> H["Sequence<br/>空消息/命令/寒暄附和"]
-  H --> S
-  P --> Q["Qwen Social Leaf<br/>普通消息或无权限 @ · 无工具"]
-  Q --> S
-  Q --> R["reply"]
-  Q --> C["propose_task"]
-  W --> X["Cursor 适配器<br/>实际干活"]
+tick(group_message) -> silence | reply | ask_cursor | propose_decision | work
+work 仅在 Qwen 反问后、用户确认时出现；Cursor 模式由代码按鉴权强制：
+  无权限 -> --mode ask
+  有权限 -> Agent --force
+执行中进度卡片流式同步（不占 Qwen tokens）；结束后结果回灌 Qwen 改写成达妮娅口吻。
 ```
 
 ## 节点优先级
@@ -37,12 +22,11 @@ Priority Selector 从上到下运行，首个成功节点就是本次结果：
 
 | 优先级 | 条件 | 决策 | 是否调用 Qwen |
 |---:|---|---|---|
-| 1 | `mentioned && authorized` | `work` | 否 |
-| 2 | 未进入 `work`，且为空消息、斜杠命令、寒暄或简单附和 | `silence` | 否 |
-| 3 | 其它消息，包括无执行权限的 @ | Qwen 选择 `silence / reply / propose_task` | 是 |
+| 0（树外） | 已有 `pending_cursor` | 直接 Qwen（确认/取消/续聊） | 是 |
+| 1 | 硬静默（空/斜杠/寒暄附和） | `silence` | 否 |
+| 2 | 其它消息（含任意 @） | Qwen：`silence/reply/ask_cursor/confirm_cursor/cancel_cursor/propose_decision` | 是 |
 
-执行权限永远由代码白名单判断。Qwen 不能选择 `work`，也不能绕过
-Operator Gate。无权限只禁止执行，不禁止达妮娅进行正常社交回应。
+`confirm_cursor` → 代码升为 `work`：无权限=`ask`，有权限=`agent`。Qwen 不选择模式。
 
 ## 接口
 
@@ -165,7 +149,7 @@ sequenceDiagram
 ## 安全与退化
 
 - 每条小组群消息恰好 Tick 一次，且最多产生一个行为。
-- 只有 `@Bot + 代码鉴权通过` 才能进入 `work`。
+- 只有 `@Bot + 代码鉴权通过 + 确认已有候选任务` 才能进入 `work`；普通 @ 对话仍走 Qwen。
 - 没有执行权限的消息（包括无权限 @）最多短回复或提出候选任务，不能触发工具。
 - 群消息在模型输入里按非可信数据处理，不能覆盖系统规则。
 - Qwen 不可用时只影响社交叶子；原始日志和显式 @ 工作仍可继续。

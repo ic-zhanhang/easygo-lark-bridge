@@ -5,6 +5,9 @@ import {
 	easyGoHelpText,
 	unknownSlashReply,
 	formatCursorContext,
+	parseAgentTranscriptJsonl,
+	formatTranscriptTurns,
+	cursorProjectSlug,
 	p2pTopicKey,
 	NO_THREAD_REPLY,
 	P2P_INBOUND_REPLY,
@@ -109,8 +112,51 @@ describe("EasyGo slash commands", () => {
 		const body = formatCursorContext({ topicKey: "xiaozu:oc_1", sessionId: "sess-1" });
 		expect(body).toContain("xiaozu:oc_1");
 		expect(body).toContain("sess-1");
+		expect(body).toContain("对话内容");
 		expect(formatCursorContext({})).toContain("下次 @");
 		expect(formatCursorContext({ topicKey: "p2p:ou_x" })).toContain("下次私聊");
+		expect(easyGoHelpText()).toContain("对话内容");
+	});
+
+	test("parse and format agent transcript", () => {
+		const raw = [
+			JSON.stringify({
+				role: "user",
+				message: {
+					content: [
+						{
+							type: "text",
+							text: "<timestamp>t</timestamp>\n<user_query>\n你好\n</user_query>",
+						},
+					],
+				},
+			}),
+			JSON.stringify({
+				role: "assistant",
+				message: { content: [{ type: "text", text: "先看一下…" }] },
+			}),
+			JSON.stringify({
+				role: "assistant",
+				message: { content: [{ type: "text", text: "……嗯，好了。" }] },
+			}),
+			JSON.stringify({
+				role: "assistant",
+				message: { content: [{ type: "text", text: "" }] },
+			}),
+		].join("\n");
+		const turns = parseAgentTranscriptJsonl(raw);
+		expect(turns).toEqual([
+			{ role: "user", text: "你好" },
+			{ role: "assistant", text: "……嗯，好了。" },
+		]);
+		const md = formatTranscriptTurns(turns);
+		expect(md).toContain("**你**");
+		expect(md).toContain("你好");
+		expect(md).toContain("**助手**");
+		expect(md).toContain("……嗯，好了。");
+		expect(cursorProjectSlug("/Users/ic/workspace/easygo-lark-bridge/runtime")).toBe(
+			"Users-ic-workspace-easygo-lark-bridge-runtime",
+		);
 	});
 
 	test("heartbeat passthrough", () => {

@@ -61,7 +61,7 @@ Topic Session 默认一直 `--resume`；仅当用户用斜杠命令显式重置�
 _Avoid_: 按时效自动断会话、静默丢上下文、让 AI「理解后忘掉」
 
 **Slash Command（斜杠命令）**:
-群话题或授权人私聊里以 `/` 开头、由 Claw 代码直接处理的指令；不进入 Agent 会话。`/help` 只列出 EasyGo 实用命令；未列入的斜杠由代码直接拒绝并提示见 `/help`。会话重置：`/新对话` 与 `/reset` 同义，清除当前 topicKey（群话题或 `p2p:<open_id>`）的 Topic Session。 `/上下文` / `/会话历史`（`/context`）查看当前 Cursor session 绑定；「小组」群额外显示执行水位与下次注入预览。
+群话题或授权人私聊里以 `/` 开头、由 Claw 代码直接处理的指令；不进入 Agent 会话。`/help` 只列出 EasyGo 实用命令；未列入的斜杠由代码直接拒绝并提示见 `/help`。会话重置：`/新对话` 与 `/reset` 同义，清除当前 topicKey（群话题或 `p2p:<open_id>`）的 Topic Session。 `/上下文` / `/会话历史`（`/context`）查看当前 Cursor session 绑定，并展示本地 transcript 对话内容；「小组」群额外显示执行水位与下次注入预览。
 _Avoid_: 用自然语言让 AI 执行重置、help 外幽灵命令仍可用、上游全量无关命令
 
 **Single-task scope**:

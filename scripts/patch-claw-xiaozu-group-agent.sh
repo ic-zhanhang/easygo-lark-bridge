@@ -63,11 +63,49 @@ def upgrade_l1_p2p_gate(src: str) -> tuple[str, bool]:
         return src, False
     return src.replace(old_gate, new_gate, 1), True
 
+def upgrade_context_transcript(src: str) -> tuple[str, bool]:
+    """已应用小组补丁时，升级 /上下文 以展示 Cursor transcript。"""
+    old = """\t\tif (slash.kind === "context") {
+\t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
+\t\t\tconst body = xiaozuChatId
+\t\t\t\t? xiaozuGroupAgent.describeCursorContext(xiaozuChatId, { topicKey, sessionId })
+\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId });
+\t\t\tawait replyCard(messageId, body, { title: "Cursor 上下文", color: "blue" });
+\t\t\treturn;
+\t\t}"""
+    new = """\t\tif (slash.kind === "context") {
+\t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
+\t\t\tlet body = xiaozuChatId
+\t\t\t\t? xiaozuGroupAgent.describeCursorContext(xiaozuChatId, { topicKey, sessionId })
+\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId, workspace: defaultWorkspace });
+\t\t\tif (xiaozuChatId) {
+\t\t\t\tconst transcript = EasyGoCmd.loadFormattedAgentTranscript(defaultWorkspace, sessionId);
+\t\t\t\tbody += transcript
+\t\t\t\t\t? `\n\n**对话内容**\n${transcript}`
+\t\t\t\t\t: sessionId
+\t\t\t\t\t\t? "\n\n**对话内容**\n（未找到本地 transcript）"
+\t\t\t\t\t\t: "\n\n**对话内容**\n（尚无绑定会话）";
+\t\t\t}
+\t\t\tawait replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文", color: "blue" });
+\t\t\treturn;
+\t\t}"""
+    if "loadFormattedAgentTranscript" in src and 'replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文"' in src:
+        return src, False
+    if old not in src:
+        return src, False
+    return src.replace(old, new, 1), True
+
 if marker in text:
-    text, upgraded = upgrade_l1_p2p_gate(text)
-    if upgraded:
+    text, upgraded_gate = upgrade_l1_p2p_gate(text)
+    text, upgraded_ctx = upgrade_context_transcript(text)
+    if upgraded_gate or upgraded_ctx:
         server.write_text(text)
-        print("patch-claw-xiaozu-group-agent: 已应用，同步模板并升级 L1 私聊门控")
+        bits = []
+        if upgraded_gate:
+            bits.append("L1 私聊门控")
+        if upgraded_ctx:
+            bits.append("/上下文 transcript")
+        print("patch-claw-xiaozu-group-agent: 已应用，同步模板并升级 " + "、".join(bits))
     else:
         print("patch-claw-xiaozu-group-agent: 已应用，仅同步模板")
     sys.exit(0)
@@ -154,10 +192,18 @@ replace_once(
 \t\t}
 \t\tif (slash.kind === "context") {
 \t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
-\t\t\tconst body = xiaozuChatId
+\t\t\tlet body = xiaozuChatId
 \t\t\t\t? xiaozuGroupAgent.describeCursorContext(xiaozuChatId, { topicKey, sessionId })
-\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId });
-\t\t\tawait replyCard(messageId, body, { title: "Cursor 上下文", color: "blue" });
+\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId, workspace: defaultWorkspace });
+\t\t\tif (xiaozuChatId) {
+\t\t\t\tconst transcript = EasyGoCmd.loadFormattedAgentTranscript(defaultWorkspace, sessionId);
+\t\t\t\tbody += transcript
+\t\t\t\t\t? `\n\n**对话内容**\n${transcript}`
+\t\t\t\t\t: sessionId
+\t\t\t\t\t\t? "\n\n**对话内容**\n（未找到本地 transcript）"
+\t\t\t\t\t\t: "\n\n**对话内容**\n（尚无绑定会话）";
+\t\t\t}
+\t\t\tawait replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文", color: "blue" });
 \t\t\treturn;
 \t\t}
 \t\tif (slash.kind === "unknown") {''',

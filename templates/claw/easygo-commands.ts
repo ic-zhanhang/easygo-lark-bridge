@@ -1,4 +1,8 @@
 // CLAW_EASYGO_COMMANDS — 入站门控 + EasyGo 斜杠命令
+import { existsSync, readFileSync } from "fs";
+import { homedir } from "os";
+import { resolve } from "path";
+
 /** 群话题缺失时的短提示 */
 export const NO_THREAD_REPLY =
 	"请在**话题**里 @我，我才能处理这条消息。开一个话题再发一次即可。";
@@ -99,7 +103,7 @@ export function easyGoHelpText(): string {
 		"",
 		"- `/help` `/帮助` — 显示本帮助",
 		"- `/新对话` `/reset` — 重置当前 Topic Session（群话题或授权人私聊）",
-		"- `/上下文` `/会话历史` `/context` — 查看当前 Cursor 会话绑定",
+		"- `/上下文` `/会话历史` `/context` — 查看当前会话绑定与对话内容",
 		"- `/终止` `/stop` — 终止正在执行的任务",
 		"",
 		"**心跳**",
@@ -112,9 +116,117 @@ export function easyGoHelpText(): string {
 	].join("\n");
 }
 
+export type TranscriptTurn = { role: "user" | "assistant"; text: string };
+
+/** Cursor 把 workspace 路径编成 projects 目录名：/a/b → a-b */
+export function cursorProjectSlug(workspace: string): string {
+	return workspace.replace(/\\/g, "/").replace(/^\/+/, "").replace(/\//g, "-");
+}
+
+export function agentTranscriptPath(workspace: string, sessionId: string): string {
+	return resolve(
+		homedir(),
+		".cursor",
+		"projects",
+		cursorProjectSlug(workspace),
+		"agent-transcripts",
+		sessionId,
+		`${sessionId}.jsonl`,
+	);
+}
+
+function extractMessageText(message: unknown): string {
+	if (!message || typeof message !== "object") return "";
+	const content = (message as { content?: unknown }).content;
+	if (typeof content === "string") return content;
+	if (!Array.isArray(content)) return "";
+	const parts: string[] = [];
+	for (const part of content) {
+		if (typeof part === "string") parts.push(part);
+		else if (part && typeof part === "object" && (part as { type?: string }).type === "text") {
+			const t = (part as { text?: unknown }).text;
+			if (typeof t === "string") parts.push(t);
+		}
+	}
+	return parts.join("\n");
+}
+
+/** 解析 Cursor agent-transcripts JSONL；连续同角色合并（助手只留最后一条） */
+export function parseAgentTranscriptJsonl(raw: string): TranscriptTurn[] {
+	const turns: TranscriptTurn[] = [];
+	for (const line of raw.split("\n")) {
+		if (!line.trim()) continue;
+		let obj: { role?: string; message?: unknown };
+		try {
+			obj = JSON.parse(line) as { role?: string; message?: unknown };
+		} catch {
+			continue;
+		}
+		const role = obj.role;
+		if (role !== "user" && role !== "assistant") continue;
+		let text = extractMessageText(obj.message);
+		const m = text.match(/<user_query>\s*([\s\S]*?)\s*<\/user_query>/);
+		if (m) text = m[1].trim();
+		text = text.replace(/<timestamp>[\s\S]*?<\/timestamp>\s*/g, "").trim();
+		if (!text || text === "[REDACTED]") continue;
+		const last = turns[turns.length - 1];
+		if (last && last.role === role) {
+			last.text = role === "assistant" ? text : `${last.text}\n\n${text}`;
+		} else {
+			turns.push({ role, text });
+		}
+	}
+	return turns;
+}
+
+export function formatTranscriptTurns(
+	turns: TranscriptTurn[],
+	opts?: { maxTurns?: number; maxChars?: number; perTurnMax?: number },
+): string {
+	const maxTurns = opts?.maxTurns ?? 16;
+	const maxChars = opts?.maxChars ?? 10000;
+	const perTurnMax = opts?.perTurnMax ?? 800;
+	const slice = turns.slice(-maxTurns);
+	const omitted = turns.length - slice.length;
+	const lines: string[] = [];
+	if (omitted > 0) lines.push(`_（更早 ${omitted} 条已省略）_`, "");
+	for (const t of slice) {
+		const label = t.role === "user" ? "**你**" : "**助手**";
+		const body =
+			t.text.length > perTurnMax ? `${t.text.slice(0, perTurnMax)}…` : t.text;
+		lines.push(label, body, "");
+	}
+	let out = lines.join("\n").trimEnd();
+	if (out.length > maxChars) {
+		out = out.slice(out.length - maxChars);
+		const nl = out.indexOf("\n");
+		if (nl > 0 && nl < 200) out = out.slice(nl + 1);
+		out = `_（前文已截断）_\n\n${out}`;
+	}
+	return out;
+}
+
+export function loadFormattedAgentTranscript(
+	workspace: string | undefined,
+	sessionId: string | undefined,
+	opts?: { maxTurns?: number; maxChars?: number; perTurnMax?: number },
+): string | undefined {
+	if (!workspace || !sessionId) return undefined;
+	const path = agentTranscriptPath(workspace, sessionId);
+	if (!existsSync(path)) return undefined;
+	try {
+		const turns = parseAgentTranscriptJsonl(readFileSync(path, "utf-8"));
+		if (!turns.length) return undefined;
+		return formatTranscriptTurns(turns, opts);
+	} catch {
+		return undefined;
+	}
+}
+
 export function formatCursorContext(input: {
 	topicKey?: string;
 	sessionId?: string;
+	workspace?: string;
 }): string {
 	const isP2p = !!input.topicKey?.startsWith("p2p:");
 	const topic = input.topicKey ? `\`${input.topicKey}\`` : "无";
@@ -123,14 +235,20 @@ export function formatCursorContext(input: {
 		: isP2p
 			? "无（下次私聊会新建会话）"
 			: "无（下次 @ 会新建同话题会话）";
-	return [
+	const parts = [
 		"**Cursor 会话**",
 		`- topicKey：${topic}`,
 		`- sessionId：${session}`,
 		"- 清窗：`/新对话` 或 `/reset`",
 		"",
-		"说明：这里只能看到桥接侧的会话绑定；Cursor 内部完整 transcript 不在本命令展开。",
-	].join("\n");
+		"**对话内容**",
+	];
+	const transcript = loadFormattedAgentTranscript(input.workspace, input.sessionId);
+	if (transcript) parts.push(transcript);
+	else if (input.sessionId)
+		parts.push("（未找到本地 transcript，可能尚未写入或路径不匹配）");
+	else parts.push("（尚无绑定会话）");
+	return parts.join("\n");
 }
 
 export function unknownSlashReply(cmd: string): string {

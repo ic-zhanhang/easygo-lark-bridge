@@ -11,7 +11,7 @@
 | 同话题续聊 | **Topic Session**：`thread_id` ↔ Cursor `sessionId`，默认 `--resume` |
 | 多人同时使用 | 不同飞书话题最多 **3** 路并行；同话题串行 |
 | 上下文单通道 | **Relay**：不写/不读 `runtime/topics/*.jsonl` 旁路历史 |
-| 入口收敛 | **Group Topic Only**：仅群话题 @；入站私聊拒；出站通知可走私聊 |
+| 入口收敛 | **Group Topic Only**：默认群话题 @；**L1 授权人私聊**可续聊（`p2p:<open_id>`）；非授权人私聊拒；出站通知可走私聊 |
 | 仿真（Linux） | **整台机器** 同时只跑 **1** 个仿真（主机进程检测） |
 
 ---
@@ -66,12 +66,13 @@
 
 ## 6. 实现清单
 
-- [x] Group Topic Only（无话题短提示；入站私聊拒绝）
+- [x] Group Topic Only（无话题短提示；非授权人私聊拒绝；L1 私聊 `p2p:` Topic Session）
 - [x] Topic Session 绑定 + `--resume`
 - [x] 锁键 `thread:{thread_id}`，并行 ≤3，同话题串行
 - [x] Linux 仿真主机互斥
 - [x] Relay：无 topics jsonl 旁路
 - [x] EasyGo 斜杠白名单 + `/新对话`/`/reset`
+- [x] 权限仅 Claw 门控；runtime alwaysApply = soul + easygo-scope（与 IDE 等价）
 - [x] 规则 / 文档与 CONTEXT 对齐
 
 ---

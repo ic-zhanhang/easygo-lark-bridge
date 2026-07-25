@@ -13,7 +13,7 @@
 BRIDGE_PROFILE=linux bash scripts/install.sh
 ```
 
-差异：`dev-environment.mdc`、`agent-identity.mdc`、`soul.mdc`（秧秧人设）。
+差异：`dev-environment.mdc`、`soul.mdc`（秧秧人设）。权限仅 Claw 门控。
 
 **飞书应用简介（可粘贴）：**
 

@@ -213,12 +213,21 @@ gate_old = """\t\t\t// CLAW_GROUP_TOPIC_GATE: 仅对已 @Bot 的消息要求话�
 \t\t\t\treturn;
 \t\t\t}"""
 
-gate_new = """\t\t\t// CLAW_TOPIC_SESSION + CLAW_GROUP_TOPIC_GATE: Group Topic Only
+gate_new = """\t\t\t// CLAW_TOPIC_SESSION + CLAW_GROUP_TOPIC_GATE: Group Topic Only + L1 P2P
 \t\t\t{
-\t\t\t\tconst gate = EasyGoCmd.gateInboundMessage(chatType, threadId);
+\t\t\t\tconst gate = EasyGoCmd.gateInboundMessage(chatType, threadId, {
+\t\t\t\t\tsenderOpenId,
+\t\t\t\t\tauthorizerOpenIds: permCfg.authorizerOpenIds,
+\t\t\t\t});
 \t\t\t\tif (gate.action === "reject") {
 \t\t\t\t\tconsole.log(`[入站] 拒绝: ${gate.reason}`);
-\t\t\t\t\tawait replyCard(messageId, gate.reply, { title: gate.reason === "no_thread" ? "请使用话题" : "仅群话题", color: "orange" });
+\t\t\t\t\tconst rejectTitle =
+\t\t\t\t\t\tgate.reason === "no_thread"
+\t\t\t\t\t\t\t? "请使用话题"
+\t\t\t\t\t\t\t: gate.reason === "p2p_inbound"
+\t\t\t\t\t\t\t\t? "私聊受限"
+\t\t\t\t\t\t\t\t: "仅群话题";
+\t\t\t\t\tawait replyCard(messageId, gate.reply, { title: rejectTitle, color: "orange" });
 \t\t\t\t\treturn;
 \t\t\t\t}
 \t\t\t}"""

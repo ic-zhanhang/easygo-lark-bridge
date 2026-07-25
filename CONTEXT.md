@@ -28,17 +28,19 @@
 _Avoid_: 每条消息独立会话（群话题）、workspace 级单一 active 会话
 
 **Group Topic Only（仅群话题）**:
-人对 Bot 的指令只走群聊话题内的 @；无 `thread_id` 时由代码拒绝或短提示开话题，不进入 Agent。不提供私聊入口。
-「小组」白名单群是唯一例外：主群 @Bot 使用 `xiaozu:<chat_id>` 单一共享 Session；是否属于该群、是否有执行权限仍由代码判断。
-_Avoid_: 其它主群无话题接指令、入站私聊续聊、用 AI 判断权限
+人对 Bot 的指令默认走群聊话题内的 @；无 `thread_id` 时由代码拒绝或短提示开话题，不进入 Agent。
+例外：
+1. 「小组」白名单群：主群 @Bot 使用 `xiaozu:<chat_id>` 单一共享 Session；
+2. **L1 授权人私聊**：使用 `p2p:<open_id>` 绑定 Cursor Topic Session，可续聊；非授权人私聊仍拒绝。
+_Avoid_: 其它主群无话题接指令、对非授权人开放私聊入口、用 AI 判断权限
 
 **Outbound Notify（出站通知）**:
-Bot → 授权人的主动推送（如心跳摘要）仍可走私聊；这不是对话入口，不创建 Topic Session。
-_Avoid_: 把心跳私聊当成可续聊的会话
+Bot → 授权人的主动推送（如心跳摘要）仍可走私聊；心跳推送本身不创建/不绑定 Topic Session（与授权人主动私聊指令的 `p2p:` 会话分开）。
+_Avoid_: 把心跳推送卡片当成对话入口去 resume
 
 **Operator Gate（操作者门控）**:
-Claw 用代码白名单（`CHAT_OPERATOR_*`）在调用 Agent 前校验发送者；与飞书「可用范围」叠加。当前仅杨展航，作双保险，不开放给他人。
-_Avoid_: 用 AI 判断权限、多人 L2 授权流程（保留能力但默认不用）
+Claw 用代码白名单（`CHAT_OPERATOR_*`）在调用 Agent **前**校验发送者（群 @ 与授权人私聊同一门控）；与飞书「可用范围」叠加。`authorized-operator.mdc` 仅 sync 供人查阅，`alwaysApply: false`，不注入 Agent。
+_Avoid_: 用 AI / Agent 规则判断权限、把 open_id 名单塞进 alwaysApply prompt
 
 **Relay（透传）**:
 对话上下文只走 Topic Session；Claw 不维护、不注入旁路聊天记录。桥接适配（门控、会话映射、排队、飞书卡片、媒体下载）仍由代码完成。
@@ -59,7 +61,7 @@ Topic Session 默认一直 `--resume`；仅当用户用斜杠命令显式重置�
 _Avoid_: 按时效自动断会话、静默丢上下文、让 AI「理解后忘掉」
 
 **Slash Command（斜杠命令）**:
-群话题内以 `/` 开头、由 Claw 代码直接处理的指令；不进入 Agent 会话。`/help` 只列出 EasyGo 实用命令；未列入的斜杠由代码直接拒绝并提示见 `/help`。会话重置：`/新对话` 与 `/reset` 同义，仅清除当前话题的 Topic Session。 `/上下文`（`/context`）查看当前话题的 Cursor session 绑定；「小组」群额外显示执行水位与下次注入预览。
+群话题或授权人私聊里以 `/` 开头、由 Claw 代码直接处理的指令；不进入 Agent 会话。`/help` 只列出 EasyGo 实用命令；未列入的斜杠由代码直接拒绝并提示见 `/help`。会话重置：`/新对话` 与 `/reset` 同义，清除当前 topicKey（群话题或 `p2p:<open_id>`）的 Topic Session。 `/上下文` / `/会话历史`（`/context`）查看当前 Cursor session 绑定；「小组」群额外显示执行水位与下次注入预览。
 _Avoid_: 用自然语言让 AI 执行重置、help 外幽灵命令仍可用、上游全量无关命令
 
 **Single-task scope**:

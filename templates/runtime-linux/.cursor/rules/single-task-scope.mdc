@@ -1,11 +1,11 @@
 ---
-description: Topic Session 内续聊；禁止未要求时预扫全仓
-alwaysApply: true
+description: Topic Session 续聊纪律（飞书）；按需，不 alwaysApply
+alwaysApply: false
 ---
 
 # 单任务范围（Topic Session）
 
-飞书群话题内同 thread 的 @ 进入**同一 Topic Session**（可续聊）。不同话题、心跳、出站通知互不共享会话。
+飞书群话题内同 thread 的 @，或授权人私聊，进入**同一 Topic Session**（可续聊）。不同话题、不同私聊、心跳、出站通知互不共享会话。
 
 ## 必须
 

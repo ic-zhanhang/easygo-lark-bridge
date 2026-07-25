@@ -1,17 +1,16 @@
 ---
-description: 聊天权限(L2)与授权权限(L1)分级；Claw 层 + Agent 双层校验
-alwaysApply: true
+description: 权限名单（运维查阅）；门控仅 Claw permission-gate，不注入 Agent
+alwaysApply: false
 ---
 
-# 权限分级
+# 权限分级（文档）
 
-| 级别 | 名称 | 谁能 | 可 @Bot 聊天 | 可授予他人聊天权限 |
-|------|------|------|-------------|-------------------|
+| 级别 | 名称 | 谁能 | 可 @Bot / 私聊指令 | 可授予他人 |
+|------|------|------|-------------------|------------|
 | **L1** | 授权人 | {{AUTHORIZER_NAME}} | ✅ | ✅ **唯一** |
-| **L2** | 已授权用户 | 见下方名单 | ✅ | ❌ **绝无** |
+| **L2** | 已授权用户 | 见下方名单 | ✅ | ❌ |
 
-**Claw 层**（`permission-gate.ts`）已在调用 Agent 前硬校验：无 L2 直接拒；非 L1 发「授权他人」指令直接拒。  
-**Agent 层**（本文件）为补充说明；修改名单须改 `config/easygo.env` 后 `bash scripts/sync-authorized-operators.sh`。
+**执行面只在 Claw：** `permission-gate.ts` 在调用 Agent 前硬校验（群 @ 与私聊相同）。本文件由 `sync-authorized-operators.sh` 从 `config/easygo.env` 生成，供人查阅；**Agent 不依赖本文件做权限判断。**
 
 ## L1 授权人
 
@@ -21,17 +20,12 @@ alwaysApply: true
 
 {{ALL_CHAT_OPERATORS_LIST}}
 
-## L2 仅聊天（不含授权人，便于查阅）
+## L2 仅聊天（不含授权人）
 
 {{AUTHORIZED_CHAT_OPERATORS_LIST}}
 
-## 规则
+## 运维
 
-1. 发送者须有 **L2 聊天权限**，否则拒绝。
-2. **授予/撤销 L2** 仅 **L1 {{AUTHORIZER_NAME}}**；L2 用户提出为他人授权时**必须拒绝**。
-3. 添加 L2：只加 L1 **点名**的人；**open_id 必须来自本 Bot**（WebSocket `sender=` / @mention / `runtime/state/operator-registry.json`）；**禁止**用 Mac lark-cli 或其它 Bot App 查到的 id。
-4. 改 `config/easygo.env` 的 `CHAT_OPERATOR_*`（Claw 读同一文件），然后 `bash scripts/sync-authorized-operators.sh`。
-
-## 拒绝回复
-
-简短；无 L2 → 无聊天权限；L2 要求授权 → 须找 {{AUTHORIZER_NAME}}。
+1. 改 `config/easygo.env` 的 `CHAT_OPERATOR_*` / `AUTHORIZER_*`（Claw 读同一文件）
+2. `bash scripts/sync-authorized-operators.sh`（或 `install.sh`）
+3. 重启 Claw 使门控读到新 env

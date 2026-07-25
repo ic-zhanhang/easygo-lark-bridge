@@ -31,8 +31,45 @@ server = Path(sys.argv[1])
 text = server.read_text()
 marker = "CLAW_XIAOZHU_GROUP_AGENT"
 
+def upgrade_l1_p2p_gate(src: str) -> tuple[str, bool]:
+    """已应用小组补丁时，仍可升级入站门控以支持 L1 私聊。"""
+    old_gate = """\t\t\tconst inboundGate = EasyGoCmd.gateInboundMessage(chatType, threadId, {
+\t\t\t\tmainGroupTopicKey: isXiaozuChat ? `xiaozu:${chatId}` : undefined,
+\t\t\t});
+\t\t\tif (inboundGate.action === "reject") {
+\t\t\t\tconsole.log(`[入站] 拒绝: ${inboundGate.reason}`);
+\t\t\t\tawait replyCard(messageId, inboundGate.reply, { title: inboundGate.reason === "no_thread" ? "请使用话题" : "仅群话题", color: "orange" });
+\t\t\t\treturn;
+\t\t\t}"""
+    new_gate = """\t\t\tconst inboundGate = EasyGoCmd.gateInboundMessage(chatType, threadId, {
+\t\t\t\tmainGroupTopicKey: isXiaozuChat ? `xiaozu:${chatId}` : undefined,
+\t\t\t\tsenderOpenId,
+\t\t\t\tauthorizerOpenIds: permCfg.authorizerOpenIds,
+\t\t\t});
+\t\t\tif (inboundGate.action === "reject") {
+\t\t\t\tconsole.log(`[入站] 拒绝: ${inboundGate.reason}`);
+\t\t\t\tconst rejectTitle =
+\t\t\t\t\tinboundGate.reason === "no_thread"
+\t\t\t\t\t\t? "请使用话题"
+\t\t\t\t\t\t: inboundGate.reason === "p2p_inbound"
+\t\t\t\t\t\t\t? "私聊受限"
+\t\t\t\t\t\t\t: "仅群话题";
+\t\t\t\tawait replyCard(messageId, inboundGate.reply, { title: rejectTitle, color: "orange" });
+\t\t\t\treturn;
+\t\t\t}"""
+    if "authorizerOpenIds: permCfg.authorizerOpenIds" in src:
+        return src, False
+    if old_gate not in src:
+        return src, False
+    return src.replace(old_gate, new_gate, 1), True
+
 if marker in text:
-    print("patch-claw-xiaozu-group-agent: 已应用，仅同步模板")
+    text, upgraded = upgrade_l1_p2p_gate(text)
+    if upgraded:
+        server.write_text(text)
+        print("patch-claw-xiaozu-group-agent: 已应用，同步模板并升级 L1 私聊门控")
+    else:
+        print("patch-claw-xiaozu-group-agent: 已应用，仅同步模板")
     sys.exit(0)
 
 def replace_once(old: str, new: str, label: str) -> None:
@@ -210,12 +247,21 @@ replace_once(
     "未 @ Speak Gate",
 )
 replace_once(
-'''\t\t\t// CLAW_TOPIC_SESSION + CLAW_GROUP_TOPIC_GATE: Group Topic Only
+'''\t\t\t// CLAW_TOPIC_SESSION + CLAW_GROUP_TOPIC_GATE: Group Topic Only + L1 P2P
 \t\t\t{
-\t\t\t\tconst gate = EasyGoCmd.gateInboundMessage(chatType, threadId);
+\t\t\t\tconst gate = EasyGoCmd.gateInboundMessage(chatType, threadId, {
+\t\t\t\t\tsenderOpenId,
+\t\t\t\t\tauthorizerOpenIds: permCfg.authorizerOpenIds,
+\t\t\t\t});
 \t\t\t\tif (gate.action === "reject") {
 \t\t\t\t\tconsole.log(`[入站] 拒绝: ${gate.reason}`);
-\t\t\t\t\tawait replyCard(messageId, gate.reply, { title: gate.reason === "no_thread" ? "请使用话题" : "仅群话题", color: "orange" });
+\t\t\t\t\tconst rejectTitle =
+\t\t\t\t\t\tgate.reason === "no_thread"
+\t\t\t\t\t\t\t? "请使用话题"
+\t\t\t\t\t\t\t: gate.reason === "p2p_inbound"
+\t\t\t\t\t\t\t\t? "私聊受限"
+\t\t\t\t\t\t\t\t: "仅群话题";
+\t\t\t\t\tawait replyCard(messageId, gate.reply, { title: rejectTitle, color: "orange" });
 \t\t\t\t\treturn;
 \t\t\t\t}
 \t\t\t}
@@ -224,10 +270,18 @@ replace_once(
 '''\t\t\t// CLAW_TOPIC_SESSION + CLAW_GROUP_TOPIC_GATE: 普通群仍需话题；「小组」主群使用单一共享会话
 \t\t\tconst inboundGate = EasyGoCmd.gateInboundMessage(chatType, threadId, {
 \t\t\t\tmainGroupTopicKey: isXiaozuChat ? `xiaozu:${chatId}` : undefined,
+\t\t\t\tsenderOpenId,
+\t\t\t\tauthorizerOpenIds: permCfg.authorizerOpenIds,
 \t\t\t});
 \t\t\tif (inboundGate.action === "reject") {
 \t\t\t\tconsole.log(`[入站] 拒绝: ${inboundGate.reason}`);
-\t\t\t\tawait replyCard(messageId, inboundGate.reply, { title: inboundGate.reason === "no_thread" ? "请使用话题" : "仅群话题", color: "orange" });
+\t\t\t\tconst rejectTitle =
+\t\t\t\t\tinboundGate.reason === "no_thread"
+\t\t\t\t\t\t? "请使用话题"
+\t\t\t\t\t\t: inboundGate.reason === "p2p_inbound"
+\t\t\t\t\t\t\t? "私聊受限"
+\t\t\t\t\t\t\t: "仅群话题";
+\t\t\t\tawait replyCard(messageId, inboundGate.reply, { title: rejectTitle, color: "orange" });
 \t\t\t\treturn;
 \t\t\t}
 

@@ -103,7 +103,8 @@ if not already_tuned:
 │    scheduler-protocol.mdc, heartbeat-protocol.mdc
 │    cursor-capabilities.mdc
 │  记忆索引: 全工作区文本文件（memory-tool.ts）"""
-    banner_new = """│  规则: runtime/.cursor/rules/（6 条 alwaysApply + 按需 rule）
+    banner_new = """│  规则: alwaysApply = soul.mdc + easygo-scope.mdc（与 IDE 同 workspace）
+│  权限: Claw permission-gate only（authorized-operator.mdc 不注入）
 │  记忆索引: 仅 topics/、文档/（memory-tool.ts；无 MEMORY.md）"""
     if banner_old in text:
         text = text.replace(banner_old, banner_new, 1)

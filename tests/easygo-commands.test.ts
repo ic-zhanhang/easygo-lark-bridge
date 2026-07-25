@@ -5,11 +5,16 @@ import {
 	easyGoHelpText,
 	unknownSlashReply,
 	formatCursorContext,
+	p2pTopicKey,
 	NO_THREAD_REPLY,
 	P2P_INBOUND_REPLY,
 	RESET_REPLY,
 } from "../templates/claw/easygo-commands.ts";
 import { getTopicKey } from "../templates/claw/topic-agent.ts";
+
+const L1 = "ou_authorizer";
+const L2 = "ou_other";
+const authorizers = new Set([L1]);
 
 describe("Group Topic Only inbound gate", () => {
 	test("group with thread_id is allowed with topicKey", () => {
@@ -33,13 +38,38 @@ describe("Group Topic Only inbound gate", () => {
 		expect(r).toEqual({ action: "allow", topicKey: "xiaozu:oc_123" });
 	});
 
-	test("p2p inbound is rejected", () => {
-		const r = gateInboundMessage("p2p", undefined);
+	test("non-authorizer p2p inbound is rejected", () => {
+		const r = gateInboundMessage("p2p", undefined, {
+			senderOpenId: L2,
+			authorizerOpenIds: authorizers,
+		});
 		expect(r.action).toBe("reject");
 		if (r.action === "reject") {
 			expect(r.reason).toBe("p2p_inbound");
 			expect(r.reply).toBe(P2P_INBOUND_REPLY);
 		}
+	});
+
+	test("p2p without authorizer list is rejected", () => {
+		const r = gateInboundMessage("p2p", undefined, { senderOpenId: L1 });
+		expect(r.action).toBe("reject");
+	});
+
+	test("authorizer p2p inbound is allowed with p2p topicKey", () => {
+		const r = gateInboundMessage("p2p", undefined, {
+			senderOpenId: L1,
+			authorizerOpenIds: authorizers,
+		});
+		expect(r).toEqual({ action: "allow", topicKey: p2pTopicKey(L1) });
+		expect(r.action === "allow" && r.topicKey).toBe(`p2p:${L1}`);
+	});
+
+	test("authorizer private chatType also allowed", () => {
+		const r = gateInboundMessage("private", undefined, {
+			senderOpenId: L1,
+			authorizerOpenIds: [L1],
+		});
+		expect(r).toEqual({ action: "allow", topicKey: `p2p:${L1}` });
 	});
 
 	test("getTopicKey only returns group thread_id", () => {
@@ -57,9 +87,11 @@ describe("EasyGo slash commands", () => {
 		expect(help).toContain("/新对话");
 		expect(help).toContain("/reset");
 		expect(help).toContain("/上下文");
+		expect(help).toContain("/会话历史");
 		expect(help).toContain("/心跳");
+		expect(help).toContain("授权人也可私聊");
 		expect(help).not.toContain("/记忆");
-		expect(help).not.toContain("/会话");
+		expect(help).not.toContain("- `/会话` —");
 	});
 
 	test("reset aliases", () => {
@@ -72,11 +104,13 @@ describe("EasyGo slash commands", () => {
 	test("context aliases", () => {
 		expect(parseEasyGoSlash("/上下文")).toEqual({ kind: "context" });
 		expect(parseEasyGoSlash("/context")).toEqual({ kind: "context" });
+		expect(parseEasyGoSlash("/会话历史")).toEqual({ kind: "context" });
 		expect(parseEasyGoSlash("/上下文 @达妮娅")).toEqual({ kind: "context" });
 		const body = formatCursorContext({ topicKey: "xiaozu:oc_1", sessionId: "sess-1" });
 		expect(body).toContain("xiaozu:oc_1");
 		expect(body).toContain("sess-1");
 		expect(formatCursorContext({})).toContain("下次 @");
+		expect(formatCursorContext({ topicKey: "p2p:ou_x" })).toContain("下次私聊");
 	});
 
 	test("heartbeat passthrough", () => {

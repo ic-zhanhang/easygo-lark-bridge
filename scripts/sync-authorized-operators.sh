@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 从 config/easygo.env 同步权限分级 → runtime/.cursor/rules/authorized-operator.mdc
+# 仅运维文档（alwaysApply: false）；执行门控在 Claw permission-gate，读同一 env。
 set -euo pipefail
 
 PACK_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

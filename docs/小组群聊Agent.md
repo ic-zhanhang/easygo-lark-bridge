@@ -199,3 +199,13 @@ XIAOZHU_PERSONA_NAME=达妮娅
 - `scripts/patch-claw-xiaozu-group-agent.sh`
 - `tests/xiaozu-behavior-tree.test.ts`
 - `tests/xiaozu-group-agent.test.ts`
+
+
+## 本机达妮娅助手（同一角色）
+
+Mac 上小组对群发言优先走本机 `danya-assistant` 桌宠 API（`DANYA_BRIDGE_ENABLED`），与桌宠共用 `persona/danya.md` 人设与记忆线程（`thread_id=lark:xiaozu-*`，与桌宠默认 `pet` 隔离）。
+
+- 人设权威：`DANYA_PERSONA_FILE`（install 同步到 `runtime/.cursor/persona/danya.md`）
+- API 会话：`DANYA_SESSION_FILE`（桌宠/API 启动时写入）
+- 失败回落：`XIAOZHU_OLLAMA_*` Speak Gate
+- 改代码仍走确认 → Cursor；达妮娅返回 `pending_approval` 时映射为 `ask_cursor`

@@ -8,12 +8,13 @@ SERVER="${CLAW_INSTALL_DIR}/server.ts"
 GROUP_SRC="${PACK_ROOT}/templates/claw/xiaozu-group-agent.ts"
 BEHAVIOR_SRC="${PACK_ROOT}/templates/claw/xiaozu-behavior-tree.ts"
 COMMAND_SRC="${PACK_ROOT}/templates/claw/easygo-commands.ts"
+DANYA_SRC="${PACK_ROOT}/templates/claw/danya-bridge.ts"
 
 if [[ ! -f "${SERVER}" ]]; then
   echo "跳过 patch-claw-xiaozu-group-agent: 未找到 ${SERVER}"
   exit 0
 fi
-if [[ ! -f "${GROUP_SRC}" || ! -f "${BEHAVIOR_SRC}" || ! -f "${COMMAND_SRC}" ]]; then
+if [[ ! -f "${GROUP_SRC}" || ! -f "${BEHAVIOR_SRC}" || ! -f "${COMMAND_SRC}" || ! -f "${DANYA_SRC}" ]]; then
   echo "patch-claw-xiaozu-group-agent: 缺少模板" >&2
   exit 1
 fi
@@ -21,6 +22,7 @@ fi
 cp "${GROUP_SRC}" "${CLAW_INSTALL_DIR}/xiaozu-group-agent.ts"
 cp "${BEHAVIOR_SRC}" "${CLAW_INSTALL_DIR}/xiaozu-behavior-tree.ts"
 cp "${COMMAND_SRC}" "${CLAW_INSTALL_DIR}/easygo-commands.ts"
+cp "${DANYA_SRC}" "${CLAW_INSTALL_DIR}/danya-bridge.ts"
 mkdir -p "${PACK_ROOT}/runtime/state/xiaozu-groups"
 
 python3 - "${SERVER}" <<'PY'

@@ -231,6 +231,19 @@ setup_runtime() {
   mkdir -p "${RUNTIME_DIR}/.cursor/rules"
   rsync -a "${RUNTIME_TEMPLATE}/.cursor/" "${RUNTIME_DIR}/.cursor/"
 
+  # 同步本机达妮娅 canonical 人设（Mac）；Linux 秧秧不覆盖
+  if [[ "${BRIDGE_PROFILE}" == "mac" ]]; then
+    DANYA_ROOT="${DANYA_ASSISTANT_ROOT:-${HOME}/danya-assistant}"
+    PERSONA_SRC="${DANYA_PERSONA_FILE:-${DANYA_ROOT}/persona/danya.md}"
+    if [[ -f "${PERSONA_SRC}" ]]; then
+      mkdir -p "${RUNTIME_DIR}/.cursor/persona"
+      cp "${PERSONA_SRC}" "${RUNTIME_DIR}/.cursor/persona/danya.md"
+      echo "  已同步达妮娅人设 → runtime/.cursor/persona/danya.md"
+    else
+      echo "  ⚠️ 未找到 ${PERSONA_SRC}，跳过人设同步（小组仍可用 env DANYA_PERSONA_FILE）"
+    fi
+  fi
+
   RUNTIME_TEMPLATE="${RUNTIME_TEMPLATE}" RUNTIME_DIR="${RUNTIME_DIR}" \
     bash "${PACK_ROOT}/scripts/sync-authorized-operators.sh"
 
@@ -416,6 +429,7 @@ main() {
   bash "${PACK_ROOT}/scripts/patch-claw-agent-startup-grace.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-xiaozu-spectator.sh"
   bash "${PACK_ROOT}/scripts/patch-claw-xiaozu-group-agent.sh"
+  bash "${PACK_ROOT}/scripts/patch-claw-thread-context.sh"
   finalize_claw_install
   setup_claw_config
   print_next_steps

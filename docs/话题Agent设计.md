@@ -74,6 +74,7 @@
 - [x] EasyGo 斜杠白名单 + `/新对话`/`/reset`
 - [x] 权限仅 Claw 门控；runtime alwaysApply = soul + easygo-scope（与 IDE 等价）
 - [x] 规则 / 文档与 CONTEXT 对齐
+- [x] 非小组群话题注入当前 thread + 硬隔离小组旁观路径（记忆索引排除）
 
 ---
 

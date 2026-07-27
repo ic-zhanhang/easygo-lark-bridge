@@ -9,6 +9,7 @@
 3. 飞书 Topic Session / 斜杠命令由 **Claw 代码**处理；权限名单也只在 Claw（`permission-gate`），不进 Agent prompt。
 4. 仿真/SSH/容器 → 按需读 `dev-environment.mdc`。
 5. **不要**读 `topics/*.jsonl` 旁路历史（Relay）。
+6. **跨群硬隔离**：非「小组」会话禁止读 `文档/小组旁观/`、`文档/小组日报/`、`state/xiaozu-groups/`；上下文不足用 prompt 内当前话题消息，不要用其它群备忘顶替。
 
 ## 布局
 

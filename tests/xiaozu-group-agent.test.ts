@@ -5,9 +5,15 @@ import { resolve } from "path";
 import {
 	createXiaozuGroupAgent,
 	loadXiaozuGroupState,
+	personaVoiceLines,
 	saveXiaozuGroupState,
 	type XiaozuGroupAgentConfig,
 } from "../templates/claw/xiaozu-group-agent.ts";
+import {
+	extractJsonObject,
+	loadDanyaSession,
+	loadPersonaMarkdown,
+} from "../templates/claw/danya-bridge.ts";
 import {
 	appendSpectatorLine,
 	type SpectatorEntry,
@@ -30,6 +36,10 @@ function config(overrides: Partial<XiaozuGroupAgentConfig> = {}): XiaozuGroupAge
 		baseUrl: "http://127.0.0.1:11434",
 		model: "qwen2.5:14b",
 		personaName: "达妮娅",
+		personaFile: "",
+		danyaEnabled: false,
+		danyaSessionFile: "",
+		danyaTimeoutMs: 1000,
 		timeoutMs: 1000,
 		minConfidence: 0.78,
 		cooldownMs: 90_000,
@@ -588,5 +598,58 @@ describe("Cursor context inspection", () => {
 		expect(body).toContain("om_b");
 		expect(body).toContain("再补个错误码");
 		expect(body).not.toContain("讨论接口");
+	});
+});
+
+
+describe("danya bridge persona + client", () => {
+	test("personaVoiceLines loads canonical danya.md when file exists", () => {
+		const personaPath = "/Users/ic/danya-assistant/persona/danya.md";
+		const lines = personaVoiceLines("达妮娅", personaPath);
+		const joined = lines.join("\n");
+		expect(joined).toContain("权威人设");
+		expect(joined).toContain("个人工作与生活助手");
+		expect(joined).not.toContain("稍微摸会儿鱼");
+	});
+
+	test("loadPersonaMarkdown and extractJsonObject helpers", () => {
+		const md = loadPersonaMarkdown("/Users/ic/danya-assistant/persona/danya.md", 200);
+		expect(md.length).toBeGreaterThan(20);
+		expect(md.startsWith("# 达妮娅")).toBe(true);
+		expect(extractJsonObject('前言 {"action":"silence","confidence":1} 后缀')).toEqual({
+			action: "silence",
+			confidence: 1,
+		});
+		expect(loadDanyaSession("/tmp/definitely-missing-danya-session.json")).toBeNull();
+	});
+
+	test("default gate falls back to injected path when danya disabled", async () => {
+		let calls = 0;
+		const agent = createXiaozuGroupAgent({
+			workspace: workspace(),
+			config: config({ danyaEnabled: false }),
+			model: async () => {
+				calls++;
+				return {
+					action: "silence",
+					confidence: 0.9,
+					reason: "ok",
+					message: "",
+					cursor_intent: "",
+					decision_title: "",
+				};
+			},
+		});
+		const result = await agent.tick({
+			kind: "group_message",
+			chatId: "oc_1",
+			messageId: "om_1",
+			text: "随便聊聊",
+			messageType: "text",
+			mentioned: false,
+			authorized: false,
+		});
+		expect(result.action).toBe("silence");
+		expect(calls).toBe(1);
 	});
 });

@@ -47,6 +47,11 @@ _Avoid_: 用 AI / Agent 规则判断权限、把 open_id 名单塞进 alwaysAppl
 「小组」例外使用有界增量上下文：原始消息写 JSONL，Qwen 维护短群状态，执行模型只接收上次成功水位之后的消息。
 _Avoid_: 无界注入全天群聊、用 AI 判断执行权限、把模型摘要当唯一事实源
 
+**Thread Context Isolation（话题上下文隔离）**:
+非「小组」群话题 @ 时，Claw 拉取**当前 thread** 消息注入 prompt，并写明禁止读 `文档/小组旁观/` 等跨群路径；记忆索引也排除小组旁观/日报目录。
+_Avoid_: 空上下文时翻其它群旁观日志、用小组备忘顶替当前话题需求
+
+
 **Behavior Tick（群行为树）**:
 「小组」每条群消息恰好调用一次 `tick(group_message)`；Priority Selector 依次选择 `work / silence / reply / propose_task`。行为树只选行为，不保存记忆或任务。Qwen 是无工具的 Social Leaf；异常、超时、低置信度都返回静默。只有 `@Bot + 代码权限通过` 才能选中 `work`。
 无权限的 `@Bot` 仍可进入 Qwen 做社交判断，但会显式标记 `execution_allowed=false`，最多静默、回复或提出候选任务。

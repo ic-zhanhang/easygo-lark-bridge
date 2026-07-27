@@ -52,6 +52,7 @@ PATCHES=(
   patch-claw-agent-startup-grace.sh
   patch-claw-xiaozu-spectator.sh
   patch-claw-xiaozu-group-agent.sh
+  patch-claw-thread-context.sh
 )
 
 # 与 install.sh 一致：部分 patch 允许软失败（上游片段漂移）

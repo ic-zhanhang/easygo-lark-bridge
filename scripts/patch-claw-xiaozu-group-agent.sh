@@ -66,7 +66,49 @@ def upgrade_l1_p2p_gate(src: str) -> tuple[str, bool]:
     return src.replace(old_gate, new_gate, 1), True
 
 def upgrade_context_transcript(src: str) -> tuple[str, bool]:
-    """已应用小组补丁时，升级 /上下文 以展示 Cursor transcript。"""
+    """已应用小组补丁时，升级 /上下文 以展示 Cursor transcript；修复 \\n 被写成真换行的坏补丁。"""
+    good = """\t\tif (slash.kind === "context") {
+\t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
+\t\t\tlet body = xiaozuChatId
+\t\t\t\t? xiaozuGroupAgent.describeCursorContext(xiaozuChatId, { topicKey, sessionId })
+\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId, workspace: defaultWorkspace });
+\t\t\tif (xiaozuChatId) {
+\t\t\t\tconst transcript = EasyGoCmd.loadFormattedAgentTranscript(defaultWorkspace, sessionId);
+\t\t\t\tbody += transcript
+\t\t\t\t\t? `\\n\\n**对话内容**\\n${transcript}`
+\t\t\t\t\t: sessionId
+\t\t\t\t\t\t? "\\n\\n**对话内容**\\n（未找到本地 transcript）"
+\t\t\t\t\t\t: "\\n\\n**对话内容**\\n（尚无绑定会话）";
+\t\t\t}
+\t\t\tawait replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文", color: "blue" });
+\t\t\treturn;
+\t\t}"""
+    # 坏形态：Python """ 曾把 \\n 解释成真换行，写进 server.ts
+    broken = """\t\tif (slash.kind === "context") {
+\t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
+\t\t\tlet body = xiaozuChatId
+\t\t\t\t? xiaozuGroupAgent.describeCursorContext(xiaozuChatId, { topicKey, sessionId })
+\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId, workspace: defaultWorkspace });
+\t\t\tif (xiaozuChatId) {
+\t\t\t\tconst transcript = EasyGoCmd.loadFormattedAgentTranscript(defaultWorkspace, sessionId);
+\t\t\t\tbody += transcript
+\t\t\t\t\t? `
+
+**对话内容**
+${transcript}`
+\t\t\t\t\t: sessionId
+\t\t\t\t\t\t? "
+
+**对话内容**
+（未找到本地 transcript）"
+\t\t\t\t\t\t: "
+
+**对话内容**
+（尚无绑定会话）";
+\t\t\t}
+\t\t\tawait replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文", color: "blue" });
+\t\t\treturn;
+\t\t}"""
     old = """\t\tif (slash.kind === "context") {
 \t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
 \t\t\tconst body = xiaozuChatId
@@ -75,28 +117,13 @@ def upgrade_context_transcript(src: str) -> tuple[str, bool]:
 \t\t\tawait replyCard(messageId, body, { title: "Cursor 上下文", color: "blue" });
 \t\t\treturn;
 \t\t}"""
-    new = """\t\tif (slash.kind === "context") {
-\t\t\tconst sessionId = topicKey ? topicSessionRepo.get(topicKey) : undefined;
-\t\t\tlet body = xiaozuChatId
-\t\t\t\t? xiaozuGroupAgent.describeCursorContext(xiaozuChatId, { topicKey, sessionId })
-\t\t\t\t: EasyGoCmd.formatCursorContext({ topicKey, sessionId, workspace: defaultWorkspace });
-\t\t\tif (xiaozuChatId) {
-\t\t\t\tconst transcript = EasyGoCmd.loadFormattedAgentTranscript(defaultWorkspace, sessionId);
-\t\t\t\tbody += transcript
-\t\t\t\t\t? `\n\n**对话内容**\n${transcript}`
-\t\t\t\t\t: sessionId
-\t\t\t\t\t\t? "\n\n**对话内容**\n（未找到本地 transcript）"
-\t\t\t\t\t\t: "\n\n**对话内容**\n（尚无绑定会话）";
-\t\t\t}
-\t\t\tawait replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文", color: "blue" });
-\t\t\treturn;
-\t\t}"""
-    if "loadFormattedAgentTranscript" in src and 'replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文"' in src:
+    if good in src:
         return src, False
-    if old not in src:
-        return src, False
-    return src.replace(old, new, 1), True
-
+    if broken in src:
+        return src.replace(broken, good, 1), True
+    if old in src:
+        return src.replace(old, good, 1), True
+    return src, False
 if marker in text:
     text, upgraded_gate = upgrade_l1_p2p_gate(text)
     text, upgraded_ctx = upgrade_context_transcript(text)
@@ -200,10 +227,10 @@ replace_once(
 \t\t\tif (xiaozuChatId) {
 \t\t\t\tconst transcript = EasyGoCmd.loadFormattedAgentTranscript(defaultWorkspace, sessionId);
 \t\t\t\tbody += transcript
-\t\t\t\t\t? `\n\n**对话内容**\n${transcript}`
+\t\t\t\t\t? `\\n\\n**对话内容**\\n${transcript}`
 \t\t\t\t\t: sessionId
-\t\t\t\t\t\t? "\n\n**对话内容**\n（未找到本地 transcript）"
-\t\t\t\t\t\t: "\n\n**对话内容**\n（尚无绑定会话）";
+\t\t\t\t\t\t? "\\n\\n**对话内容**\\n（未找到本地 transcript）"
+\t\t\t\t\t\t: "\\n\\n**对话内容**\\n（尚无绑定会话）";
 \t\t\t}
 \t\t\tawait replyLongMessage(messageId, chatId, body, { title: "Cursor 上下文", color: "blue" });
 \t\t\treturn;

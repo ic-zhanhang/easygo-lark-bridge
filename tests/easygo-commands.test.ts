@@ -12,7 +12,6 @@ import {
 	NO_THREAD_REPLY,
 	P2P_INBOUND_REPLY,
 	RESET_REPLY,
-	applyAgingAlertControl,
 } from "../templates/claw/easygo-commands.ts";
 import { getTopicKey } from "../templates/claw/topic-agent.ts";
 
@@ -178,50 +177,4 @@ describe("EasyGo slash commands", () => {
 	test("not slash", () => {
 		expect(parseEasyGoSlash("帮我看 CI")).toEqual({ kind: "not_slash" });
 	});
-	test("aging alert slash commands", () => {
-		expect(parseEasyGoSlash("/关闭报警")).toEqual({ kind: "aging_alert_mute" });
-		expect(parseEasyGoSlash("/关闭老化报警")).toEqual({ kind: "aging_alert_mute" });
-		expect(parseEasyGoSlash("/打开报警")).toEqual({ kind: "aging_alert_unmute" });
-		expect(parseEasyGoSlash("/开启报警")).toEqual({ kind: "aging_alert_unmute" });
-		expect(parseEasyGoSlash("/报警状态")).toEqual({ kind: "aging_alert_status" });
-		const help = easyGoHelpText();
-		expect(help).toContain("/关闭报警");
-		expect(help).toContain("/打开报警");
-	});
-
-	test("aging alert control talks to observe API", async () => {
-		const calls: Array<{ url: string; init?: RequestInit }> = [];
-		const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
-			const url = String(input);
-			calls.push({ url, init });
-			if (init?.method === "POST") {
-				return new Response(JSON.stringify({ ok: true, muted: true, muted_by: "ou_x" }), {
-					status: 200,
-					headers: { "content-type": "application/json" },
-				});
-			}
-			return new Response(JSON.stringify({ ok: true, muted: false }), {
-				status: 200,
-				headers: { "content-type": "application/json" },
-			});
-		}) as typeof fetch;
-		const prev = process.env.AGING_ALERT_CONTROL_URL;
-		process.env.AGING_ALERT_CONTROL_URL = "http://127.0.0.1:4194";
-		try {
-			const muted = await applyAgingAlertControl("aging_alert_mute", {
-				by: "ou_x",
-				fetchImpl,
-			});
-			expect(muted.ok).toBe(true);
-			expect(muted.message).toContain("关闭");
-			expect(calls[0]?.init?.method).toBe("POST");
-			const status = await applyAgingAlertControl("aging_alert_status", { fetchImpl });
-			expect(status.ok).toBe(true);
-			expect(status.muted).toBe(false);
-		} finally {
-			if (prev === undefined) delete process.env.AGING_ALERT_CONTROL_URL;
-			else process.env.AGING_ALERT_CONTROL_URL = prev;
-		}
-	});
-
 });

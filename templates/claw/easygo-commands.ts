@@ -75,9 +75,6 @@ export type EasyGoSlashKind =
 	| { kind: "context" }
 	| { kind: "heartbeat"; raw: string }
 	| { kind: "stop"; raw: string }
-	| { kind: "aging_alert_mute" }
-	| { kind: "aging_alert_unmute" }
-	| { kind: "aging_alert_status" }
 	| { kind: "unknown"; cmd: string }
 	| { kind: "not_slash" };
 
@@ -95,15 +92,6 @@ export function parseEasyGoSlash(text: string): EasyGoSlashKind {
 	if (/^\/(stop|终止|停止)\s*$/i.test(trimmed)) {
 		return { kind: "stop", raw: trimmed };
 	}
-	if (/^\/(关闭报警|关闭老化报警)(\s|$)/i.test(trimmed)) {
-		return { kind: "aging_alert_mute" };
-	}
-	if (/^\/(打开报警|开启报警|打开老化报警|开启老化报警)(\s|$)/i.test(trimmed)) {
-		return { kind: "aging_alert_unmute" };
-	}
-	if (/^\/(报警状态|老化报警状态)(\s|$)/i.test(trimmed)) {
-		return { kind: "aging_alert_status" };
-	}
 
 	const cmd = trimmed.split(/[\s:：]/)[0] || trimmed;
 	return { kind: "unknown", cmd };
@@ -117,11 +105,6 @@ export function easyGoHelpText(): string {
 		"- `/新对话` `/reset` — 重置当前 Topic Session（群话题或授权人私聊）",
 		"- `/上下文` `/会话历史` `/context` — 查看当前会话绑定与对话内容",
 		"- `/终止` `/stop` — 终止正在执行的任务",
-		"",
-		"**老化报警（Linux 秧秧）**",
-		"- `/关闭报警` — 静音老化异常推送（日报仍发）",
-		"- `/打开报警` — 恢复老化异常推送",
-		"- `/报警状态` — 查看当前是否静音",
 		"",
 		"**心跳**",
 		"- `/心跳` — 查看心跳状态",
@@ -266,92 +249,6 @@ export function formatCursorContext(input: {
 		parts.push("（未找到本地 transcript，可能尚未写入或路径不匹配）");
 	else parts.push("（尚无绑定会话）");
 	return parts.join("\n");
-}
-
-
-/** Linux 秧秧本机 observe 控制地址；Mac 未配置则不可用。 */
-export function agingAlertControlUrl(): string | undefined {
-	const fromEnv = (process.env.AGING_ALERT_CONTROL_URL || "").trim();
-	if (fromEnv) return fromEnv.replace(/\/$/, "");
-	if ((process.env.BRIDGE_PROFILE || "").trim() === "linux") {
-		return "http://127.0.0.1:4194";
-	}
-	return undefined;
-}
-
-export type AgingAlertControlResult = {
-	ok: boolean;
-	muted?: boolean;
-	muted_by?: string;
-	message: string;
-};
-
-export async function applyAgingAlertControl(
-	kind: "aging_alert_mute" | "aging_alert_unmute" | "aging_alert_status",
-	opts?: { by?: string; fetchImpl?: typeof fetch },
-): Promise<AgingAlertControlResult> {
-	const base = agingAlertControlUrl();
-	if (!base) {
-		return {
-			ok: false,
-			message: "当前环境未配置老化报警控制（仅 Linux 秧秧可用）。",
-		};
-	}
-	const fetcher = opts?.fetchImpl ?? fetch;
-	try {
-		if (kind === "aging_alert_status") {
-			const res = await fetcher(`${base}/aging/alert/control`);
-			const data = (await res.json()) as {
-				ok?: boolean;
-				muted?: boolean;
-				muted_by?: string;
-				message?: string;
-			};
-			if (!res.ok || data.ok === false) {
-				return {
-					ok: false,
-					message: data.message || `查询失败 HTTP ${res.status}`,
-				};
-			}
-			return {
-				ok: true,
-				muted: !!data.muted,
-				muted_by: data.muted_by || "",
-				message: data.muted
-					? `老化异常报警已关闭${data.muted_by ? `（by ${data.muted_by}）` : ""}。日报仍会发送。`
-					: "老化异常报警已开启。",
-			};
-		}
-		const muted = kind === "aging_alert_mute";
-		const res = await fetcher(`${base}/aging/alert/control`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ muted, by: opts?.by || "秧秧" }),
-		});
-		const data = (await res.json()) as {
-			ok?: boolean;
-			muted?: boolean;
-			muted_by?: string;
-			message?: string;
-		};
-		if (!res.ok || data.ok === false) {
-			return {
-				ok: false,
-				message: data.message || `设置失败 HTTP ${res.status}`,
-			};
-		}
-		return {
-			ok: true,
-			muted: !!data.muted,
-			muted_by: data.muted_by || "",
-			message: muted
-				? "好，已关闭老化异常报警。需要时用 `/打开报警` 恢复。"
-				: "好，已打开老化异常报警。",
-		};
-	} catch (error) {
-		const detail = error instanceof Error ? error.message : String(error);
-		return { ok: false, message: `无法连接 observe 告警服务：${detail}` };
-	}
 }
 
 export function unknownSlashReply(cmd: string): string {

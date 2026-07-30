@@ -167,6 +167,14 @@ easygo_slash = """\t// CLAW_TOPIC_SESSION: EasyGo 斜杠白名单（先于上游
 \t\t\tawait replyCard(messageId, EasyGoCmd.RESET_REPLY, { title: "新会话", color: "blue" });
 \t\t\treturn;
 \t\t}
+\t\tif (slash.kind === "aging_alert_mute" || slash.kind === "aging_alert_unmute" || slash.kind === "aging_alert_status") {
+\t\t\tconst control = await EasyGoCmd.applyAgingAlertControl(slash.kind, { by: senderOpenId || "秧秧" });
+\t\t\tawait replyCard(messageId, control.message, {
+\t\t\t\ttitle: control.ok ? "老化报警" : "老化报警失败",
+\t\t\t\tcolor: control.ok ? "blue" : "orange",
+\t\t\t});
+\t\t\treturn;
+\t\t}
 \t\tif (slash.kind === "unknown") {
 \t\t\tawait replyCard(messageId, EasyGoCmd.unknownSlashReply(slash.cmd), { title: "未知指令", color: "orange" });
 \t\t\treturn;
@@ -181,6 +189,23 @@ if help_marker not in text:
     sys.exit(1)
 if "CLAW_TOPIC_SESSION: EasyGo 斜杠" not in text:
     text = text.replace(help_marker, easygo_slash, 1)
+elif "aging_alert_mute" not in text:
+    # 升级已安装的斜杠白名单：补上老化报警控制
+    needle = "\t\tif (slash.kind === \"unknown\") {"
+    insert = """\t\tif (slash.kind === "aging_alert_mute" || slash.kind === "aging_alert_unmute" || slash.kind === "aging_alert_status") {
+\t\t\tconst control = await EasyGoCmd.applyAgingAlertControl(slash.kind, { by: senderOpenId || "秧秧" });
+\t\t\tawait replyCard(messageId, control.message, {
+\t\t\t\ttitle: control.ok ? "老化报警" : "老化报警失败",
+\t\t\t\tcolor: control.ok ? "blue" : "orange",
+\t\t\t});
+\t\t\treturn;
+\t\t}
+"""
+    if needle not in text:
+        print("patch-claw-topic-session: 无法升级老化报警斜杠", file=sys.stderr)
+        sys.exit(1)
+    text = text.replace(needle, insert + needle, 1)
+    print("patch-claw-topic-session: 已升级老化报警斜杠")
 
 # ── notify on sessionRenewed after runAgent ──
 run_ret_variants = [

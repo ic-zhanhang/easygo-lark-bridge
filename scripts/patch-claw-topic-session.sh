@@ -22,7 +22,29 @@ server = Path(sys.argv[1])
 text = server.read_text()
 
 if "CLAW_TOPIC_SESSION" in text:
-    print("patch-claw-topic-session: 已应用，跳过")
+    if "aging_alert_mute" in text:
+        print("patch-claw-topic-session: 已应用，跳过")
+        sys.exit(0)
+    needle = "\t\tif (slash.kind === \"unknown\") {"
+    insert = """\t\tif (slash.kind === "aging_alert_mute" || slash.kind === "aging_alert_unmute" || slash.kind === "aging_alert_status") {
+\t\t\tconst control = await EasyGoCmd.applyAgingAlertControl(slash.kind, { by: senderOpenId || "秧秧" });
+\t\t\tawait replyCard(messageId, control.message, {
+\t\t\t\ttitle: control.ok ? "老化报警" : "老化报警失败",
+\t\t\t\tcolor: control.ok ? "blue" : "orange",
+\t\t\t});
+\t\t\treturn;
+\t\t}
+"""
+    # 优先升级 EasyGo 斜杠块里的 unknown 分支
+    marker = "CLAW_TOPIC_SESSION: EasyGo 斜杠"
+    idx = text.find(marker)
+    pos = text.find(needle, idx if idx >= 0 else 0)
+    if pos < 0:
+        print("patch-claw-topic-session: 无法升级老化报警斜杠", file=sys.stderr)
+        sys.exit(1)
+    text = text[:pos] + insert + text[pos:]
+    server.write_text(text)
+    print("patch-claw-topic-session: 已升级老化报警斜杠")
     sys.exit(0)
 
 # ── imports ──

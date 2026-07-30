@@ -540,7 +540,9 @@ async function callDanyaGate(request: GateModelRequest): Promise<unknown> {
 	].join("\n");
 	const result = await danyaChat(session, {
 		text: payload,
-		threadId: "lark:xiaozu-gate",
+		threadId: request.feishu?.chatId
+			? `lark:xiaozu:${request.feishu.chatId}:gate`
+			: "lark:xiaozu:_unknown:gate",
 		workspaceScope: "everyday",
 		timeoutMs: request.config.danyaTimeoutMs,
 	});
@@ -994,9 +996,12 @@ export function createXiaozuGroupAgent(options: {
 		saveXiaozuGroupState(options.workspace, state);
 	}
 
-	async function rewriteCursorResult(raw: string): Promise<string> {
+	async function rewriteCursorResult(raw: string, chatId?: string): Promise<string> {
 		const clipped = cleanText(raw.replace(/\s+/g, " "), 2500);
 		if (!clipped) return "";
+		const rewriteThread = chatId
+			? `lark:xiaozu:${chatId}:rewrite`
+			: "lark:xiaozu:_unknown:rewrite";
 
 		if (config.danyaEnabled) {
 			try {
@@ -1005,13 +1010,14 @@ export function createXiaozuGroupAgent(options: {
 					const result = await danyaChat(session, {
 						text: [
 							"[飞书通道 · 改写]",
+							chatId ? `chat_id=${chatId}` : "chat_id=（未知）",
 							"把下面幕后工具的结果改写成你要对小组群说的话。",
 							"短、自然；不要提 Cursor/模型/工具/权限；不要编造工具没说的事实。",
 							"只输出一段对群正文，不要 JSON、不要标题。",
 							"",
 							`工具原始结果：\n${clipped}`,
 						].join("\n"),
-						threadId: "lark:xiaozu-rewrite",
+						threadId: rewriteThread,
 						workspaceScope: "everyday",
 						timeoutMs: Math.min(config.danyaTimeoutMs, 60_000),
 					});

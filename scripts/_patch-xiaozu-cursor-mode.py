@@ -154,7 +154,7 @@ if "resolvedXiaozuCursorMode" not in text:
         "\t\tlet personaResult = resultWithNote;\n"
         "\t\tif (xiaozuTaskTurn) {\n"
         "\t\t\txiaozuGroupAgent.completeTaskTurn(xiaozuTaskTurn, resultWithNote);\n"
-        "\t\t\tpersonaResult = await xiaozuGroupAgent.rewriteCursorResult(resultWithNote);\n"
+        "\t\t\tpersonaResult = await xiaozuGroupAgent.rewriteCursorResult(resultWithNote, xiaozuTaskTurn.chatId);\n"
         "\t\t}\n"
         "\t\tprogressEnabled = false;\n",
         "run+rewrite",

@@ -1,42 +1,68 @@
-# Mac 飞书：并行中继 → 关断 claw
+# Mac 飞书：达妮娅整窗接管（关断 claw）
 
-> 范围：仅 Mac 达妮娅。Linux 秧秧继续用 bridge，本文件不适用于 Linux。
+> 范围：仅 Mac 达妮娅。Linux 秧秧继续用 bridge。
 
-## 当前阶段：并行
+## 模型（重要）
+
+飞书群对话窗 = **本地达妮娅 Qwen**，与桌宠同一人格与记忆体系。
 
 ```text
-飞书 ──► claw（WS / 权限 / 卡片 / Cursor）
-            │
-            │  POST /api/channels/feishu/tick
-            ▼
-       danya-assistant（人格 / 记忆 / 决策）
-            │
-            ▼
-       claw 执行 replyCard / ask→Cursor
+飞书消息
+  → chat_once（千问人格 / 按群 namespace 记忆）
+  → 紫色互动卡片回复
+  → ask 时等群友「确认」
+  → start_channel_work（Cursor 幕后执行）
+  → 完成：Qwen compose_result → 再发紫卡
+
+不另起 Speak Gate / 旁路改写模型。
 ```
 
-- claw **必须仍在跑**（`com.easygo.lark-claw`）
-- 达妮娅 API **必须在跑**（桌宠或 `danya desktop --port 18765`）
-- `DANYA_BRIDGE_ENABLED=true`
-- 失败时 Speak Gate 回落 Ollama
+## 关断步骤
 
-## 关断条件（都满足再停 claw）
-
-1. 达妮娅内具备飞书长连接收消息（替代 claw WS）
-2. 达妮娅能发互动卡片 / 文本回复（替代 `replyCard`）
-3. 权限门与小组旁观策略已迁入或显式放弃
-4. 定时「小组日报」有替代调度
-5. 私聊 Cursor 遥控路径有替代或确认不再需要经 claw
-6. 并行期观察 ≥ 数日无回归
-
-关断命令（届时再执行）：
+1. 配好凭证（env 优先）：
 
 ```bash
-bash scripts/claw-service.sh stop
-# 或 launchctl bootout gui/$(id -u) com.easygo.lark-claw
+export FEISHU_APP_ID=...
+export FEISHU_APP_SECRET=...
+export XIAOZHU_CHAT_ID=oc_0a2bd151890eede76f4595a89e5f21c2
+export DANYA_FEISHU_ENABLED=true
+# 可选：CHAT_OPERATOR 对应 open_id 写入 settings.yaml feishu.operator_open_ids
 ```
+
+2. **先停本机 claw**（同一 App 只能一条长连接）：
+
+```bash
+cd ~/workspace/easygo-lark-bridge
+bash scripts/claw-service.sh stop
+```
+
+3. 启动达妮娅飞书：
+
+```bash
+cd ~/danya-assistant
+danya feishu --with-desktop
+```
+
+4. 验收清单：
+
+- [ ] 小组群闲聊有紫卡回复（达妮娅口吻）
+- [ ] ask → 回复「确认」→ 启动 Cursor → 完成后紫卡叙述
+- [ ] `danya memory list` 可见 `[来源:飞书小组群:…]`
+- [ ] 工作日 13:30 日报窗口（无精华则不发）
+
+## 已迁入
+
+| 能力 | 落点 |
+|---|---|
+| WS 收消息 | `feishu_runtime` |
+| Tick / 人格 | `feishu_channel` → `chat_once` |
+| 紫卡 | `feishu_cards` |
+| Cursor 确认 | `feishu_group_state` + `app.start_channel_work` |
+| 完成叙述 | 既有 `compose_result` → proactive → 推群 |
+| 小组日报 | `feishu_digest`（13:30 工作日） |
+| 记忆 | ADR 0007 namespace |
 
 ## 相关
 
-- 达妮娅 ADR：`danya-assistant` → `.aw/adr/0006-feishu-mac-parallel-relay.md`
-- 通道 API：`POST /api/channels/feishu/tick`
+- 达妮娅 ADR 0006 / 0007
+- `POST /api/channels/feishu/tick`（并行期仍可用；关断后进程内调用）
